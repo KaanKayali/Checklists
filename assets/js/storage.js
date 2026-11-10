@@ -1,5 +1,5 @@
 /**
- * Storage Module for Checklists
+ * Storage Module for Checklists / Boards
  * Handles localStorage persistence, JSON export, and JSON import.
  */
 
@@ -12,98 +12,8 @@ export function generateId(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
 }
 
-export function getDefaultChecklists(lang = 'de') {
-  const isDe = lang === 'de';
-  const now = Date.now();
-  const yesterday = now - 24 * 60 * 60 * 1000;
-  const twoDaysAgo = now - 48 * 60 * 60 * 1000;
-
-  return [
-    {
-      id: generateId('cl'),
-      title: isDe ? 'Wochenplanung & Einkäufe' : 'Weekly Plan & Groceries',
-      pinned: true,
-      createdAt: twoDaysAgo,
-      updatedAt: yesterday,
-      sections: [
-        {
-          id: generateId('sec'),
-          title: isDe ? 'Montag:' : 'Monday:',
-          tasks: [
-            { id: generateId('task'), text: isDe ? 'Bio-Hafermilch & Espresso-Bohnen' : 'Organic Oat Milk & Espresso Beans', completed: true, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Frisches Obst & Beeren für Frühstück' : 'Fresh berries & fruits for breakfast', completed: true, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Brot vom Bäcker holen' : 'Fresh sourdough bread', completed: false, crossedOut: false }
-          ]
-        },
-        {
-          id: generateId('sec'),
-          title: isDe ? 'Mittwoch:' : 'Wednesday:',
-          tasks: [
-            { id: generateId('task'), text: isDe ? 'Zutaten für Pasta Pesto besorgen' : 'Ingredients for Pasta Pesto', completed: false, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Olivenöl & Parmesan' : 'Olive oil & Parmesan', completed: false, crossedOut: false }
-          ]
-        },
-        {
-          id: generateId('sec'),
-          title: isDe ? 'Wochenende:' : 'Weekend:',
-          tasks: [
-            { id: generateId('task'), text: isDe ? 'Grillgemüse & Grillkäse' : 'Barbecue veggies & Halloumi', completed: false, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Kuchen für Sonntag vorbereiten' : 'Bake Sunday dessert cake', completed: false, crossedOut: false }
-          ]
-        }
-      ]
-    },
-    {
-      id: generateId('cl'),
-      title: isDe ? 'Reisevorbereitung Urlaub' : 'Vacation Packing List',
-      pinned: true,
-      createdAt: twoDaysAgo + 3600000,
-      updatedAt: now - 3600000,
-      sections: [
-        {
-          id: generateId('sec'),
-          title: isDe ? 'Wichtige Dokumente:' : 'Important Documents:',
-          tasks: [
-            { id: generateId('task'), text: isDe ? 'Reisepass & Personalausweis prüfen' : 'Check Passport & ID validity', completed: true, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Flugtickets & Hotelreservierung in Wallet' : 'Flight tickets & Hotel confirmation in Wallet', completed: true, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Auslandskrankenversicherung' : 'Travel insurance confirmation', completed: false, crossedOut: false }
-          ]
-        },
-        {
-          id: generateId('sec'),
-          title: isDe ? 'Technik:' : 'Electronics:',
-          tasks: [
-            { id: generateId('task'), text: isDe ? 'Powerbank & USB-C Ladekabel' : 'Powerbank & USB-C charging cables', completed: false, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Kopfhörer (Noise Cancelling)' : 'Noise Cancelling Headphones', completed: false, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Reiseadapter für Steckdosen' : 'Travel adapter plug', completed: false, crossedOut: false }
-          ]
-        }
-      ]
-    },
-    {
-      id: generateId('cl'),
-      title: isDe ? 'Projekt Roadmap v1.0.0' : 'Project Roadmap v1.0.0',
-      pinned: false,
-      createdAt: twoDaysAgo - 86400000,
-      updatedAt: now - 1800000,
-      sections: [
-        {
-          id: generateId('sec'),
-          title: isDe ? 'Sprint 1:' : 'Sprint 1:',
-          tasks: [
-            { id: generateId('task'), text: isDe ? 'PWA Manifest & Service Worker registrieren' : 'PWA Manifest & Service Worker setup', completed: true, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Responsives Design für iPhone & Laptop testen' : 'Responsive test for iPhone & Desktop', completed: true, crossedOut: false },
-            { id: generateId('task'), text: isDe ? 'Undo/Redo & Gesten-Unterstützung' : 'Undo/Redo & gesture support', completed: true, crossedOut: false }
-          ]
-        }
-      ]
-    }
-  ];
-}
-
 export function getDefaultState() {
   const browserLang = (typeof navigator !== 'undefined' && navigator.language && navigator.language.toLowerCase().startsWith('de')) ? 'de' : 'en';
-  const defaultChecklists = getDefaultChecklists(browserLang);
 
   return {
     version: 1,
@@ -111,13 +21,14 @@ export function getDefaultState() {
       language: browserLang,
       theme: 'light', // 'light' | 'dark' | 'system'
       fontSize: 'medium', // 'small' | 'medium' | 'large' | 'xlarge'
-      sortBy: 'updatedAt_desc' // 'manual' | 'updatedAt_desc' | 'createdAt_desc' | 'title_asc'
+      sortBy: 'updatedAt_desc', // 'updatedAt_desc' | 'createdAt_desc' | 'title_asc' | 'manual'
+      pinnedCollapsed: false
     },
-    activeChecklistId: defaultChecklists[0]?.id || null,
+    activeBoardId: null,
     scrollPositions: {
       overview: 0
     },
-    checklists: defaultChecklists
+    boards: [] // Clean initial state with ZERO sample data as requested
   };
 }
 
@@ -130,11 +41,27 @@ export function loadData() {
       return initial;
     }
     const parsed = JSON.parse(raw);
-    if (!parsed || !Array.isArray(parsed.checklists)) {
+    
+    // Support legacy "checklists" field migrating to "boards"
+    if (parsed && !Array.isArray(parsed.boards) && Array.isArray(parsed.checklists)) {
+      parsed.boards = parsed.checklists;
+    }
+
+    if (!parsed || !Array.isArray(parsed.boards)) {
       const fallback = getDefaultState();
       saveData(fallback);
       return fallback;
     }
+
+    if (!parsed.settings) {
+      parsed.settings = getDefaultState().settings;
+    }
+
+    // Support legacy activeChecklistId
+    if (parsed.activeChecklistId && !parsed.activeBoardId) {
+      parsed.activeBoardId = parsed.activeChecklistId;
+    }
+
     return parsed;
   } catch (err) {
     console.error('Failed to parse localStorage data:', err);
@@ -144,6 +71,9 @@ export function loadData() {
 
 export function saveData(data) {
   try {
+    // Keep legacy field synced for export compatibility if needed
+    data.checklists = data.boards;
+    data.activeChecklistId = data.activeBoardId;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (err) {
     console.error('Failed to save data to localStorage:', err);
@@ -178,21 +108,21 @@ export function exportDataToFile(data) {
 export function parseImportJSON(jsonText) {
   try {
     const parsed = JSON.parse(jsonText);
-    
-    // Support either full backup wrapper or direct data state
     const payload = parsed.data || parsed;
 
-    if (!payload || !Array.isArray(payload.checklists)) {
-      throw new Error('Missing checklists array in JSON');
+    // Support either boards or checklists array
+    const boards = payload.boards || payload.checklists;
+    if (!boards || !Array.isArray(boards)) {
+      throw new Error('Missing boards array in JSON');
     }
 
-    // Validate that each checklist has required fields
-    for (const cl of payload.checklists) {
-      if (!cl.id || !cl.title || !Array.isArray(cl.sections)) {
-        throw new Error('Checklist item missing required fields');
+    for (const b of boards) {
+      if (!b.id || !b.title || !Array.isArray(b.sections)) {
+        throw new Error('Board item missing required fields');
       }
     }
 
+    payload.boards = boards;
     return payload;
   } catch (err) {
     console.error('Import validation failed:', err);
@@ -201,37 +131,38 @@ export function parseImportJSON(jsonText) {
 }
 
 export function mergeImportData(existingState, importedPayload, replaceMode = false) {
+  const importedBoards = importedPayload.boards || importedPayload.checklists || [];
+
   if (replaceMode) {
     return {
       ...existingState,
       settings: importedPayload.settings || existingState.settings,
-      checklists: importedPayload.checklists,
-      activeChecklistId: importedPayload.checklists[0]?.id || null,
+      boards: importedBoards,
+      activeBoardId: importedBoards[0]?.id || null,
       scrollPositions: importedPayload.scrollPositions || { overview: 0 }
     };
   }
 
-  // Merge mode: append or update checklists
-  const checklistMap = new Map();
-  for (const cl of existingState.checklists) {
-    checklistMap.set(cl.id, cl);
+  // Merge mode
+  const boardMap = new Map();
+  for (const b of existingState.boards) {
+    boardMap.set(b.id, b);
   }
 
-  for (const cl of importedPayload.checklists) {
-    // If id already exists, create a new ID to avoid overwriting or merge cleanly
-    if (checklistMap.has(cl.id)) {
-      const cloned = JSON.parse(JSON.stringify(cl));
-      cloned.id = generateId('cl');
+  for (const b of importedBoards) {
+    if (boardMap.has(b.id)) {
+      const cloned = JSON.parse(JSON.stringify(b));
+      cloned.id = generateId('b');
       cloned.title = `${cloned.title} (Imported)`;
-      checklistMap.set(cloned.id, cloned);
+      boardMap.set(cloned.id, cloned);
     } else {
-      checklistMap.set(cl.id, cl);
+      boardMap.set(b.id, b);
     }
   }
 
   return {
     ...existingState,
-    checklists: Array.from(checklistMap.values())
+    boards: Array.from(boardMap.values())
   };
 }
 

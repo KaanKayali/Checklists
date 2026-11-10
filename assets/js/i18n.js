@@ -1,23 +1,23 @@
 /**
  * Internationalization (i18n) Module for Checklists
  * English (en) and German (de)
+ * All checklist items are termed "Boards".
  */
 
 export const translations = {
   en: {
     appName: 'Checklists',
     version: 'v1.0.0',
-    appTitle: 'Checklists v1.0.0',
-    allChecklists: 'All Checklists',
-    pinnedChecklists: 'Pinned Checklists',
-    checklistCounter: (count) => count === 1 ? '1 Checklist' : `${count} Checklists`,
-    tasksCount: (done, total) => `${done}/${total} done`,
-    noChecklistsYet: 'No checklists yet',
-    noChecklistsSub: 'Tap the + button to create your first checklist.',
-    noPinnedChecklists: 'No pinned checklists',
-    noTasksInSection: 'No tasks in this section. Type below to add one.',
-    newChecklist: 'New Checklist',
-    checklistTitlePlaceholder: 'Checklist name...',
+    appTitle: 'Checklists',
+    allBoards: 'All Boards',
+    pinnedBoards: 'Pinned',
+    boardCounter: (count) => count === 1 ? '1 Board' : `${count} Boards`,
+    noBoardsYet: 'No boards yet',
+    noBoardsSub: 'Tap the button below to create your first board.',
+    noPinnedBoards: 'No pinned boards',
+    noTasksInSection: 'No tasks here. Tap + to add one.',
+    newBoard: 'New Board',
+    boardTitlePlaceholder: 'Board name...',
     create: 'Create',
     cancel: 'Cancel',
     save: 'Save',
@@ -25,14 +25,15 @@ export const translations = {
     delete: 'Delete',
     undo: 'Undo',
     redo: 'Redo',
-    pin: 'Pin Checklist',
-    unpin: 'Unpin Checklist',
-    rename: 'Rename Checklist',
-    duplicate: 'Duplicate Checklist',
-    clearCompleted: 'Clear Completed Tasks',
-    deleteChecklist: 'Delete Checklist',
-    confirmDeleteChecklist: 'Are you sure you want to delete this checklist? This cannot be undone.',
-    sectionTitlePlaceholder: 'Section name (e.g. Wednesday, Weekend)...',
+    pin: 'Pin Board',
+    unpin: 'Unpin Board',
+    deleteBoard: 'Delete Board',
+    confirmDeleteBoard: 'Are you sure you want to delete this board? This cannot be undone.',
+    selectBoards: 'Select Boards',
+    sortBy: 'Sort By',
+    sortDefaultSubtitle: 'Default (Date Edited)',
+    darkMode: 'Dark Mode',
+    sectionTitlePlaceholder: 'Section name (e.g. Wednesday:, Weekend:)...',
     addSection: 'Add Day / Section',
     newSectionPrompt: 'New Section / Day',
     addTaskPlaceholder: 'Add a new task...',
@@ -40,74 +41,64 @@ export const translations = {
     crossOutTask: 'Cross Out',
     uncrossTask: 'Restore Text',
     clearText: 'Clear Text',
-    cursorNotice: 'Editing at cursor position',
     
-    // Settings
+    // Settings Modal
     settings: 'Settings',
     generalSettings: 'General Settings',
-    sorting: 'Sort Checklists By',
-    sortDefault: 'Manual / Default Order',
-    sortUpdated: 'Date Edited (Most Recent)',
+    sorting: 'Sort Boards By',
+    sortDefault: 'Default (Date Edited)',
     sortCreated: 'Date Created',
     sortTitle: 'Alphabetical (A - Z)',
-    darkMode: 'Dark Mode',
     themeLight: 'Light',
     themeDark: 'Dark',
     themeSystem: 'System Auto',
-    fontSize: 'Font Size in Checklist',
+    fontSize: 'Font Size in Board',
     fontSizeSmall: 'Small',
     fontSizeMedium: 'Medium',
     fontSizeLarge: 'Large',
     fontSizeXLarge: 'Extra Large',
     language: 'Language',
     langEn: 'English',
-    langDe: 'Deutsch (German)',
+    langDe: 'Deutsch',
     
     // Data Management
     dataManagement: 'Data Management',
     exportData: 'Export Data (JSON)',
-    exportDesc: 'Download your checklists as a JSON backup file.',
+    exportDesc: 'Download your boards as a JSON backup file.',
     importData: 'Import Data (JSON)',
-    importDesc: 'Restore or merge checklists from a JSON file.',
+    importDesc: 'Restore or merge boards from a JSON file.',
     importSuccess: 'Data imported successfully!',
     importInvalid: 'Invalid backup file format.',
     importReplaceOrMerge: 'How would you like to import this data?',
     importReplace: 'Replace All Data',
     importMerge: 'Merge with Existing',
-    resetData: 'Delete All Data',
+    resetData: 'Delete Data',
     resetDesc: 'Factory reset of local storage.',
-    confirmResetData: 'WARNING: Are you sure you want to delete ALL data? This will permanently erase all your checklists and cannot be undone!',
+    confirmResetData: 'WARNING: Are you sure you want to delete ALL data? This will permanently erase all your boards and cannot be undone!',
     resetSuccess: 'All data has been deleted.',
     
     // Timestamps
     createdOn: (dateStr) => `Created ${dateStr}`,
     editedOn: (dateStr, timeStr) => `Edited ${dateStr} at ${timeStr}`,
-    editedRelative: (rel) => `edited ${rel}`,
-    justNow: 'Just now',
     yesterday: 'Yesterday',
     today: 'Today',
-    daysAgo: (days) => `${days} days ago`,
 
     // Empty detail view state (desktop)
-    selectChecklistPrompt: 'Select a checklist from the sidebar or create a new one.',
-    
-    // Swipe action
-    swipeToDelete: 'Swipe left to delete'
+    selectBoardPrompt: 'Select a board from the sidebar or create a new one.'
   },
   de: {
     appName: 'Checklists',
     version: 'v1.0.0',
-    appTitle: 'Checklists v1.0.0',
-    allChecklists: 'Alle Checklisten',
-    pinnedChecklists: 'Angeheftete Checklisten',
-    checklistCounter: (count) => count === 1 ? '1 Checkliste' : `${count} Checklisten`,
-    tasksCount: (done, total) => `${done}/${total} erledigt`,
-    noChecklistsYet: 'Noch keine Checklisten vorhanden',
-    noChecklistsSub: 'Tippe auf den Stift-Button, um deine erste Checkliste zu erstellen.',
-    noPinnedChecklists: 'Keine angehefteten Checklisten',
-    noTasksInSection: 'Keine Aufgaben in diesem Abschnitt. Unten tippen, um eine hinzuzufügen.',
-    newChecklist: 'Neue Checkliste',
-    checklistTitlePlaceholder: 'Name der Checkliste...',
+    appTitle: 'Checklists',
+    allBoards: 'All Boards',
+    pinnedBoards: 'Pinned',
+    boardCounter: (count) => count === 1 ? '1 Board' : `${count} Boards`,
+    noBoardsYet: 'Noch keine Boards vorhanden',
+    noBoardsSub: 'Tippe auf den Button unten, um dein erstes Board zu erstellen.',
+    noPinnedBoards: 'Keine angehefteten Boards',
+    noTasksInSection: 'Keine Aufgaben. Tippe +, um eine hinzuzufügen.',
+    newBoard: 'Neues Board',
+    boardTitlePlaceholder: 'Name des Boards...',
     create: 'Erstellen',
     cancel: 'Abbrechen',
     save: 'Speichern',
@@ -115,13 +106,14 @@ export const translations = {
     delete: 'Löschen',
     undo: 'Rückgängig',
     redo: 'Wiederholen',
-    pin: 'Checkliste anheften',
-    unpin: 'Anheftung lösen',
-    rename: 'Checkliste umbenennen',
-    duplicate: 'Checkliste duplizieren',
-    clearCompleted: 'Erledigte Aufgaben bereinigen',
-    deleteChecklist: 'Checkliste löschen',
-    confirmDeleteChecklist: 'Möchtest du diese Checkliste wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
+    pin: 'Board anheften',
+    unpin: 'Board lösen',
+    deleteBoard: 'Board löschen',
+    confirmDeleteBoard: 'Möchtest du dieses Board wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
+    selectBoards: 'Boards auswählen',
+    sortBy: 'Sortieren',
+    sortDefaultSubtitle: 'Standard (Zuletzt bearbeitet)',
+    darkMode: 'Dunkelmodus',
     sectionTitlePlaceholder: 'Abschnittsname (z.B. Mittwoch:, Wochenende:)...',
     addSection: 'Tag / Abschnitt hinzufügen',
     newSectionPrompt: 'Neuer Tag / Abschnitt',
@@ -130,21 +122,18 @@ export const translations = {
     crossOutTask: 'Durchstreichen',
     uncrossTask: 'Wiederherstellen',
     clearText: 'Text löschen',
-    cursorNotice: 'Aktion an Cursor-Position',
     
-    // Settings
+    // Settings Modal
     settings: 'Einstellungen',
     generalSettings: 'Allgemeine Einstellungen',
-    sorting: 'Checklisten sortieren nach',
-    sortDefault: 'Standard / Manuell',
-    sortUpdated: 'Zuletzt bearbeitet',
+    sorting: 'Boards sortieren nach',
+    sortDefault: 'Standard (Zuletzt bearbeitet)',
     sortCreated: 'Erstellungsdatum',
     sortTitle: 'Alphabetisch (A - Z)',
-    darkMode: 'Dunkelmodus',
     themeLight: 'Hell',
     themeDark: 'Dunkel',
     themeSystem: 'Systemeinstellung',
-    fontSize: 'Schriftgröße in Checkliste',
+    fontSize: 'Schriftgröße im Board',
     fontSizeSmall: 'Klein',
     fontSizeMedium: 'Mittel',
     fontSizeLarge: 'Groß',
@@ -156,7 +145,7 @@ export const translations = {
     // Data Management
     dataManagement: 'Datenverwaltung',
     exportData: 'Daten exportieren (JSON)',
-    exportDesc: 'Lade deine Checklisten als JSON-Sicherungsdatei herunter.',
+    exportDesc: 'Lade deine Boards als JSON-Sicherungsdatei herunter.',
     importData: 'Daten importieren (JSON)',
     importDesc: 'Wiederherstellen oder Zusammenführen aus einer JSON-Datei.',
     importSuccess: 'Daten erfolgreich importiert!',
@@ -164,25 +153,19 @@ export const translations = {
     importReplaceOrMerge: 'Wie sollen die Daten importiert werden?',
     importReplace: 'Alle Daten ersetzen',
     importMerge: 'Mit bestehenden Daten zusammenführen',
-    resetData: 'Alle Daten löschen',
+    resetData: 'Daten löschen',
     resetDesc: 'Vollständiges Zurücksetzen des lokalen Speichers.',
-    confirmResetData: 'WARNUNG: Möchtest du wirklich ALLE lokalen Daten löschen? Alle Checklisten werden unwiderruflich gelöscht!',
+    confirmResetData: 'WARNUNG: Möchtest du wirklich ALLE lokalen Daten löschen? Alle Boards werden unwiderruflich gelöscht!',
     resetSuccess: 'Alle Daten wurden erfolgreich gelöscht.',
     
     // Timestamps
     createdOn: (dateStr) => `Erstellt am ${dateStr}`,
     editedOn: (dateStr, timeStr) => `Bearbeitet am ${dateStr} um ${timeStr}`,
-    editedRelative: (rel) => `bearbeitet ${rel}`,
-    justNow: 'Gerade eben',
     yesterday: 'Gestern',
     today: 'Heute',
-    daysAgo: (days) => `vor ${days} Tagen`,
 
     // Empty detail view state (desktop)
-    selectChecklistPrompt: 'Wähle eine Checkliste aus der Seitenleiste oder erstelle eine neue.',
-
-    // Swipe action
-    swipeToDelete: 'Nach links wischen zum Löschen'
+    selectBoardPrompt: 'Wähle ein Board aus der Seitenleiste oder erstelle ein neues.'
   }
 };
 
@@ -210,21 +193,15 @@ export function t(key, ...args) {
   if (val !== undefined) {
     return val;
   }
-  // Fallback to English
   const fallback = translations.en[key];
   if (typeof fallback === 'function') return fallback(...args);
   return fallback !== undefined ? fallback : key;
 }
 
-/**
- * Format date nicely according to current language
- */
 export function formatFullDate(timestamp) {
   const date = new Date(timestamp);
   if (isNaN(date.getTime())) return '';
   const lang = currentLanguage === 'de' ? 'de-DE' : 'en-US';
-  
-  // Format day, month name, year
   const options = { day: '2-digit', month: 'long', year: 'numeric' };
   return new Intl.DateTimeFormat(lang, options).format(date);
 }
@@ -237,35 +214,33 @@ export function formatTime(timestamp) {
   return `${hours}:${minutes}`;
 }
 
-export function formatRelativeDate(timestamp) {
+/**
+ * Exact board timestamp logic requested:
+ * - If edited today: ONLY the time (e.g. 19:11)
+ * - If edited yesterday: ONLY Yesterday (or Gestern)
+ * - If earlier: Date format (e.g. 28.10.2026)
+ * - The word "edited" is NEVER shown anywhere!
+ */
+export function formatBoardTimestamp(timestamp) {
+  if (!timestamp) return '';
   const now = new Date();
   const date = new Date(timestamp);
-  const diffMs = now - date;
-  const diffSec = Math.floor(diffMs / 1000);
-  const diffMin = Math.floor(diffSec / 60);
-  const diffHour = Math.floor(diffMin / 60);
-  const diffDay = Math.floor(diffHour / 24);
+  if (isNaN(date.getTime())) return '';
 
-  if (diffMin < 2) {
-    return t('justNow');
-  }
-
-  // Check if today
   const isToday = now.toDateString() === date.toDateString();
   if (isToday) {
-    return `${t('today')} ${formatTime(timestamp)}`;
+    return formatTime(timestamp);
   }
 
-  // Check if yesterday
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   if (yesterday.toDateString() === date.toDateString()) {
-    return `${t('yesterday')} ${formatTime(timestamp)}`;
+    return t('yesterday');
   }
 
-  if (diffDay < 7) {
-    return t('daysAgo', diffDay);
-  }
-
-  return formatFullDate(timestamp);
+  // Format as DD.MM.YYYY (e.g. 28.10.2026)
+  const d = String(date.getDate()).padStart(2, '0');
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const y = date.getFullYear();
+  return `${d}.${m}.${y}`;
 }

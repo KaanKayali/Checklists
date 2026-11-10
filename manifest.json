@@ -1,13 +1,13 @@
 {
   "name": "Checklists",
   "short_name": "Checklists",
-  "description": "Clean, modern, offline-ready Checklists web application & PWA",
+  "description": "Clean, modern, offline-ready Checklists & Boards web application & PWA",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f4f5f7",
-  "theme_color": "#ffc114",
+  "background_color": "#f8f9fb",
+  "theme_color": "#f8f9fb",
   "icons": [
     {
       "src": "assets/icons/icon-192.png",

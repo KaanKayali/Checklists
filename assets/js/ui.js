@@ -1,14 +1,18 @@
 /**
  * UI Controller for Checklists Web Application
  * Handles DOM rendering, cursor tracking, gestures, undo stack, and interactions.
+ * Configured for Boards structure matching design wireframe & reference images.
  */
 
-import { t, getLanguage, setLanguage, formatFullDate, formatTime, formatRelativeDate } from './i18n.js';
+import { t, getLanguage, setLanguage, formatFullDate, formatTime, formatBoardTimestamp } from './i18n.js';
 import { generateId, saveData, exportDataToFile, parseImportJSON, mergeImportData, clearAllStorage, getDefaultState } from './storage.js';
 
 export class UIController {
   constructor(state) {
     this.state = state;
+    if (!this.state.boards) {
+      this.state.boards = this.state.checklists || [];
+    }
     this.activeTaskId = null; // Currently focused task ID for cursor logic
     this.activeSectionId = null;
     this.undoStack = [];
@@ -22,14 +26,17 @@ export class UIController {
 
     // Header elements
     this.brandTitleEl = document.getElementById('brandTitle');
-    this.checklistCounterEl = document.getElementById('checklistCounter');
+    this.boardCounterEl = document.getElementById('boardCounter');
     this.btnMainMenu = document.getElementById('btnMainMenu');
     this.mainMenuDropdown = document.getElementById('mainMenuDropdown');
+    this.menuSortSubtitle = document.getElementById('menuSortSubtitle');
+    this.darkModeIcon = document.getElementById('darkModeIcon');
 
     // Master View lists
     this.pinnedSectionContainer = document.getElementById('pinnedSectionContainer');
-    this.pinnedListEl = document.getElementById('pinnedList');
-    this.allListEl = document.getElementById('allList');
+    this.btnTogglePinned = document.getElementById('btnTogglePinned');
+    this.pinnedContainer = document.getElementById('pinnedContainer');
+    this.allContainer = document.getElementById('allContainer');
     this.btnFab = document.getElementById('btnFab');
 
     // Detail View elements
@@ -39,6 +46,8 @@ export class UIController {
     this.btnUndo = document.getElementById('btnUndo');
     this.btnDetailMenu = document.getElementById('btnDetailMenu');
     this.detailMenuDropdown = document.getElementById('detailMenuDropdown');
+    this.pinMenuLabel = document.getElementById('pinMenuLabel');
+    this.pinMenuIcon = document.getElementById('pinMenuIcon');
     this.detailContent = document.getElementById('detailContent');
     this.sectionsContainer = document.getElementById('sectionsContainer');
 
@@ -47,11 +56,10 @@ export class UIController {
     this.btnAddSection = document.getElementById('btnAddSection');
     this.btnCrossOut = document.getElementById('btnCrossOut');
     this.btnClearText = document.getElementById('btnClearText');
-    this.cursorStatusPill = document.getElementById('cursorStatusPill');
 
     // Modals
     this.settingsModal = document.getElementById('settingsModal');
-    this.newChecklistModal = document.getElementById('newChecklistModal');
+    this.newBoardModal = document.getElementById('newBoardModal');
     this.newSectionModal = document.getElementById('newSectionModal');
     this.confirmModal = document.getElementById('confirmModal');
     this.toastEl = document.getElementById('toast');
@@ -67,28 +75,29 @@ export class UIController {
     this.bindEvents();
     this.renderOverview();
 
-    // Restore active checklist
-    if (this.state.activeChecklistId) {
-      const activeCl = this.getChecklist(this.state.activeChecklistId);
-      if (activeCl) {
-        this.openChecklist(activeCl.id, false);
-      } else if (this.state.checklists.length > 0) {
-        this.openChecklist(this.state.checklists[0].id, false);
+    // Restore active board
+    if (this.state.activeBoardId) {
+      const activeBoard = this.getBoard(this.state.activeBoardId);
+      if (activeBoard) {
+        this.openBoard(activeBoard.id, false);
+      } else if (this.state.boards.length > 0) {
+        this.openBoard(this.state.boards[0].id, false);
       }
-    } else if (window.innerWidth >= 860 && this.state.checklists.length > 0) {
-      this.openChecklist(this.state.checklists[0].id, false);
+    } else if (window.innerWidth >= 860 && this.state.boards.length > 0) {
+      this.openBoard(this.state.boards[0].id, false);
     }
 
     this.restoreScrollPositions();
     this.updateStaticTranslations();
+    this.updateSortSubtitle();
   }
 
   // --- State Persistence & Undo ---
 
   pushUndoState() {
-    const activeCl = this.getActiveChecklist();
-    if (!activeCl) return;
-    const snapshot = JSON.parse(JSON.stringify(activeCl));
+    const activeBoard = this.getActiveBoard();
+    if (!activeBoard) return;
+    const snapshot = JSON.parse(JSON.stringify(activeBoard));
     this.undoStack.push(snapshot);
     if (this.undoStack.length > this.maxUndoStack) {
       this.undoStack.shift();
@@ -99,9 +108,9 @@ export class UIController {
   undo() {
     if (this.undoStack.length === 0) return;
     const previousSnapshot = this.undoStack.pop();
-    const index = this.state.checklists.findIndex(c => c.id === previousSnapshot.id);
+    const index = this.state.boards.findIndex(b => b.id === previousSnapshot.id);
     if (index !== -1) {
-      this.state.checklists[index] = previousSnapshot;
+      this.state.boards[index] = previousSnapshot;
       this.save();
       this.renderOverview();
       this.renderDetail();
@@ -120,12 +129,12 @@ export class UIController {
     saveData(this.state);
   }
 
-  getActiveChecklist() {
-    return this.state.checklists.find(c => c.id === this.state.activeChecklistId);
+  getActiveBoard() {
+    return this.state.boards.find(b => b.id === this.state.activeBoardId);
   }
 
-  getChecklist(id) {
-    return this.state.checklists.find(c => c.id === id);
+  getBoard(id) {
+    return this.state.boards.find(b => b.id === id);
   }
 
   // --- Scroll Restoration ---
@@ -137,8 +146,8 @@ export class UIController {
       const mc = this.masterView.querySelector('.master-content');
       if (mc) this.state.scrollPositions.overview = mc.scrollTop;
     }
-    if (this.state.activeChecklistId && this.detailContent) {
-      this.state.scrollPositions[`cl_${this.state.activeChecklistId}`] = this.detailContent.scrollTop;
+    if (this.state.activeBoardId && this.detailContent) {
+      this.state.scrollPositions[`b_${this.state.activeBoardId}`] = this.detailContent.scrollTop;
     }
     this.save();
   }
@@ -153,8 +162,8 @@ export class UIController {
       }
     }
 
-    if (this.state.activeChecklistId && this.detailContent) {
-      const savedY = this.state.scrollPositions[`cl_${this.state.activeChecklistId}`];
+    if (this.state.activeBoardId && this.detailContent) {
+      const savedY = this.state.scrollPositions[`b_${this.state.activeBoardId}`];
       if (savedY !== undefined) {
         this.detailContent.scrollTop = savedY;
       }
@@ -170,11 +179,23 @@ export class UIController {
       effective = prefersDark ? 'dark' : 'light';
     }
     document.documentElement.setAttribute('data-theme', effective);
+    
+    // Header safe area and theme-color matches the background of the theme
+    const themeBg = effective === 'dark' ? '#1a202c' : '#f8f9fb';
+    document.documentElement.style.backgroundColor = themeBg;
+    document.body.style.backgroundColor = themeBg;
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
-      metaTheme.setAttribute('content', effective === 'dark' ? '#1a202c' : '#ffc114');
+      metaTheme.setAttribute('content', themeBg);
     }
     this.save();
+  }
+
+  toggleThemeDirectly() {
+    const current = this.state.settings.theme || 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    this.applyTheme(next);
+    this.showToast(`${t('darkMode')}: ${next === 'dark' ? t('themeDark') : t('themeLight')}`);
   }
 
   applyFontSize(size) {
@@ -184,8 +205,8 @@ export class UIController {
   }
 
   // --- Sorting ---
-  getSortedChecklists(checklists) {
-    const list = [...checklists];
+  getSortedBoards(boards) {
+    const list = [...boards];
     const sortBy = this.state.settings.sortBy || 'updatedAt_desc';
 
     if (sortBy === 'updatedAt_desc') {
@@ -197,14 +218,42 @@ export class UIController {
     if (sortBy === 'title_asc') {
       return list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
     }
-    // Default manual order
     return list;
   }
 
+  cycleSortOrder() {
+    const current = this.state.settings.sortBy || 'updatedAt_desc';
+    let next = 'updatedAt_desc';
+    if (current === 'updatedAt_desc') next = 'createdAt_desc';
+    else if (current === 'createdAt_desc') next = 'title_asc';
+    else if (current === 'title_asc') next = 'manual';
+    else next = 'updatedAt_desc';
+
+    this.state.settings.sortBy = next;
+    this.save();
+    this.updateSortSubtitle();
+    this.renderOverview();
+    this.showToast(`${t('sortBy')}: ${this.getSortLabel(next)}`);
+  }
+
+  getSortLabel(sortBy) {
+    if (sortBy === 'updatedAt_desc') return t('sortDefault');
+    if (sortBy === 'createdAt_desc') return t('sortCreated');
+    if (sortBy === 'title_asc') return t('sortTitle');
+    return t('sortDefault');
+  }
+
+  updateSortSubtitle() {
+    if (this.menuSortSubtitle) {
+      const sortBy = this.state.settings.sortBy || 'updatedAt_desc';
+      this.menuSortSubtitle.textContent = this.getSortLabel(sortBy);
+    }
+  }
+
   // --- View Switching ---
-  openChecklist(id, pushHistory = true) {
+  openBoard(id, pushHistory = true) {
     this.saveScrollPosition();
-    this.state.activeChecklistId = id;
+    this.state.activeBoardId = id;
     this.activeTaskId = null;
     this.undoStack = [];
     this.updateUndoButtonState();
@@ -217,10 +266,9 @@ export class UIController {
       this.viewContainer.classList.add('detail-active');
     }
 
-    // Restore scroll for this checklist
     setTimeout(() => {
       if (this.detailContent && this.state.scrollPositions) {
-        const savedY = this.state.scrollPositions[`cl_${id}`];
+        const savedY = this.state.scrollPositions[`b_${id}`];
         if (savedY !== undefined) {
           this.detailContent.scrollTop = savedY;
         } else {
@@ -233,7 +281,7 @@ export class UIController {
   closeDetail() {
     this.saveScrollPosition();
     this.viewContainer.classList.remove('detail-active');
-    this.state.activeChecklistId = null;
+    this.state.activeBoardId = null;
     this.activeTaskId = null;
     this.save();
     this.renderOverview();
@@ -241,92 +289,101 @@ export class UIController {
 
   // --- Rendering Overview (Master View) ---
   renderOverview() {
-    const all = this.getSortedChecklists(this.state.checklists);
-    const pinned = all.filter(c => c.pinned);
-    const unpinned = all.filter(c => !c.pinned);
+    const all = this.getSortedBoards(this.state.boards || []);
+    const pinned = all.filter(b => b.pinned);
+    const unpinned = all.filter(b => !b.pinned);
 
-    // Update Counter
-    if (this.checklistCounterEl) {
-      this.checklistCounterEl.textContent = t('checklistCounter', all.length);
+    // Update Counter (stands below the title header above boards)
+    if (this.boardCounterEl) {
+      this.boardCounterEl.textContent = t('boardCounter', all.length);
     }
 
-    // Render Pinned Checklists
-    if (this.pinnedSectionContainer && this.pinnedListEl) {
+    // Render Pinned Boards
+    if (this.pinnedSectionContainer && this.pinnedContainer) {
       if (pinned.length > 0) {
         this.pinnedSectionContainer.style.display = 'block';
-        this.pinnedListEl.innerHTML = pinned.map(cl => this.createChecklistCardHTML(cl)).join('');
+        this.pinnedContainer.innerHTML = pinned.map(b => this.createBoardRowHTML(b)).join('');
+        
+        // Handle collapse state
+        const isCollapsed = !!this.state.settings.pinnedCollapsed;
+        if (isCollapsed) {
+          this.pinnedContainer.classList.add('collapsed');
+          this.btnTogglePinned?.classList.add('collapsed');
+        } else {
+          this.pinnedContainer.classList.remove('collapsed');
+          this.btnTogglePinned?.classList.remove('collapsed');
+        }
       } else {
         this.pinnedSectionContainer.style.display = 'none';
-        this.pinnedListEl.innerHTML = '';
+        this.pinnedContainer.innerHTML = '';
       }
     }
 
-    // Render All / Unpinned Checklists
-    if (this.allListEl) {
+    // Render All / Unpinned Boards
+    if (this.allContainer) {
       if (unpinned.length === 0 && pinned.length === 0) {
-        this.allListEl.innerHTML = `
+        this.allContainer.innerHTML = `
           <div class="empty-state">
             <div class="empty-state-icon">
               <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-2 10h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/>
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
               </svg>
             </div>
-            <div class="empty-state-title">${t('noChecklistsYet')}</div>
-            <div class="empty-state-sub">${t('noChecklistsSub')}</div>
+            <div class="empty-state-title">${t('noBoardsYet')}</div>
+            <div class="empty-state-sub">${t('noBoardsSub')}</div>
           </div>
         `;
       } else {
-        this.allListEl.innerHTML = unpinned.map(cl => this.createChecklistCardHTML(cl)).join('');
+        this.allContainer.innerHTML = unpinned.map(b => this.createBoardRowHTML(b)).join('');
       }
     }
 
-    // Bind click events on checklist cards
-    const cards = this.masterView.querySelectorAll('.checklist-card');
-    cards.forEach(card => {
-      card.addEventListener('click', (e) => {
-        const id = card.getAttribute('data-id');
-        this.openChecklist(id);
+    // Bind click events on board rows
+    const rows = this.masterView.querySelectorAll('.board-row');
+    rows.forEach(row => {
+      row.addEventListener('click', (e) => {
+        const id = row.getAttribute('data-id');
+        this.openBoard(id);
       });
     });
   }
 
-  createChecklistCardHTML(cl) {
-    const isActive = cl.id === this.state.activeChecklistId;
+  /**
+   * Generates Board row HTML matching Image 1 & Image 2 wireframe:
+   * - Board title (bold, wraps onto next line without ellipsis)
+   * - Timestamp underneath: Only time if today, only Yesterday if yesterday, date like 28.10.2026 if earlier.
+   * - NO "edited" text anywhere.
+   * - Followed by task / section preview.
+   * - NO "done" counter badge.
+   */
+  createBoardRowHTML(board) {
+    const isActive = board.id === this.state.activeBoardId;
     
-    // Calculate total & completed tasks
-    let totalTasks = 0;
-    let completedTasks = 0;
-    let previewTexts = [];
-
-    if (cl.sections) {
-      for (const sec of cl.sections) {
-        if (sec.tasks) {
-          for (const task of sec.tasks) {
-            totalTasks++;
-            if (task.completed) completedTasks++;
-            if (previewTexts.length < 2 && task.text) {
-              previewTexts.push(task.text);
-            }
+    // Find preview text: first task text, or first section title
+    let previewText = '';
+    if (board.sections) {
+      for (const sec of board.sections) {
+        if (sec.tasks && sec.tasks.length > 0) {
+          const firstTask = sec.tasks.find(t => t.text && t.text.trim() !== '');
+          if (firstTask) {
+            previewText = firstTask.text;
+            break;
           }
+        }
+        if (!previewText && sec.title && sec.title.trim() !== '') {
+          previewText = sec.title;
         }
       }
     }
 
-    const preview = previewTexts.length > 0 ? previewTexts.join(' • ') : (cl.sections?.[0]?.title || '');
-    const isAllDone = totalTasks > 0 && totalTasks === completedTasks;
-    const progressClass = isAllDone ? 'progress-pill completed' : 'progress-pill';
-    const relativeTime = formatRelativeDate(cl.updatedAt || cl.createdAt);
+    const timestampStr = formatBoardTimestamp(board.updatedAt || board.createdAt);
 
     return `
-      <div class="checklist-card ${isActive ? 'active' : ''}" data-id="${cl.id}">
-        <div class="checklist-card-top">
-          <span class="checklist-card-title">${this.escapeHTML(cl.title)}</span>
-          ${cl.pinned ? `<span class="pin-badge" title="${t('pinnedChecklists')}"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M16 9V4l1 0V2H7v2l1 0v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/></svg></span>` : ''}
-        </div>
-        ${preview ? `<div class="checklist-card-preview">${this.escapeHTML(preview)}</div>` : ''}
-        <div class="checklist-card-bottom">
-          <span class="${progressClass}">${t('tasksCount', completedTasks, totalTasks)}</span>
-          <span class="checklist-card-date">${this.escapeHTML(t('editedRelative', relativeTime))}</span>
+      <div class="board-row ${isActive ? 'active' : ''}" data-id="${board.id}">
+        <div class="board-row-title">${this.escapeHTML(board.title || t('newBoard'))}</div>
+        <div class="board-row-meta">
+          <span class="board-timestamp">${this.escapeHTML(timestampStr)}</span>
+          ${previewText ? `<span class="board-preview-text">${this.escapeHTML(previewText)}</span>` : ''}
         </div>
       </div>
     `;
@@ -334,15 +391,15 @@ export class UIController {
 
   // --- Rendering Detail View ---
   renderDetail() {
-    const cl = this.getActiveChecklist();
-    if (!cl) {
+    const board = this.getActiveBoard();
+    if (!board) {
       if (this.detailTitleInput) this.detailTitleInput.value = '';
       if (this.detailTimestampsEl) this.detailTimestampsEl.textContent = '';
       if (this.sectionsContainer) {
         this.sectionsContainer.innerHTML = `
           <div class="empty-state" style="padding-top: 100px;">
             <div class="empty-state-title">${t('appName')}</div>
-            <div class="empty-state-sub">${t('selectChecklistPrompt')}</div>
+            <div class="empty-state-sub">${t('selectBoardPrompt')}</div>
           </div>
         `;
       }
@@ -350,24 +407,38 @@ export class UIController {
     }
 
     if (this.detailTitleInput) {
-      this.detailTitleInput.value = cl.title || '';
+      this.detailTitleInput.value = board.title || '';
     }
 
-    // Timestamps: e.g. "Created 09. November 2024 | Edited 10. November 2026 at 16:30"
+    // Exact Timestamps: "Created 09. November 2024 | Edited 10. November 2026 at 16:30"
     if (this.detailTimestampsEl) {
-      const createdStr = formatFullDate(cl.createdAt || Date.now());
-      const editedDateStr = formatFullDate(cl.updatedAt || Date.now());
-      const editedTimeStr = formatTime(cl.updatedAt || Date.now());
+      const createdStr = formatFullDate(board.createdAt || Date.now());
+      const editedDateStr = formatFullDate(board.updatedAt || Date.now());
+      const editedTimeStr = formatTime(board.updatedAt || Date.now());
       this.detailTimestampsEl.textContent = `${t('createdOn', createdStr)} | ${t('editedOn', editedDateStr, editedTimeStr)}`;
+    }
+
+    // Update Pin/Unpin menu item label and icon
+    if (this.pinMenuLabel) {
+      this.pinMenuLabel.textContent = board.pinned ? t('unpin') : t('pin');
+    }
+    if (this.pinMenuIcon) {
+      if (board.pinned) {
+        // Unpin icon
+        this.pinMenuIcon.innerHTML = `<path d="M16 9V4l1 0V2H7v2l1 0v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z M2 2l20 20-1.41 1.41L13.8 16.6l-.8.8v6l-1 1-1-1v-6.97L5 14v-2c.6-.6 1.1-1.3 1.3-2.1L2 2z"/>`;
+      } else {
+        // Pin icon
+        this.pinMenuIcon.innerHTML = `<path d="M16 9V4l1 0V2H7v2l1 0v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/>`;
+      }
     }
 
     // Render Sections and tasks
     if (this.sectionsContainer) {
-      if (!cl.sections || cl.sections.length === 0) {
-        cl.sections = [{ id: generateId('sec'), title: '', tasks: [] }];
+      if (!board.sections || board.sections.length === 0) {
+        board.sections = [{ id: generateId('sec'), title: '', tasks: [] }];
       }
 
-      this.sectionsContainer.innerHTML = cl.sections.map((section, sIdx) => `
+      this.sectionsContainer.innerHTML = board.sections.map((section) => `
         <div class="task-section" data-section-id="${section.id}">
           <div class="task-section-header">
             <input type="text" 
@@ -375,7 +446,7 @@ export class UIController {
                    value="${this.escapeHTML(section.title || '')}" 
                    placeholder="${t('sectionTitlePlaceholder')}"
                    data-section-id="${section.id}">
-            ${cl.sections.length > 1 ? `
+            ${board.sections.length > 1 ? `
               <button class="btn-section-delete" data-section-id="${section.id}" title="${t('delete')}">
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                   <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
@@ -385,7 +456,7 @@ export class UIController {
           </div>
           <div class="tasks-container" data-section-id="${section.id}">
             ${(section.tasks && section.tasks.length > 0) ? section.tasks.map(task => this.createTaskItemHTML(task, section.id)).join('') : `
-              <div class="empty-state" style="padding: 16px 0 10px 0;">
+              <div class="empty-state" style="padding: 12px 0 8px 0;">
                 <div class="empty-state-sub" style="font-size: 0.85rem;">${t('noTasksInSection')}</div>
               </div>
             `}
@@ -397,16 +468,15 @@ export class UIController {
     }
 
     this.updateUndoButtonState();
-    this.updateCursorStatus();
   }
 
   createTaskItemHTML(task, sectionId) {
     const isCompleted = !!task.completed;
     const isCrossed = !!task.crossedOut;
-    const isActive = this.activeTaskId === task.id;
 
+    // Checked tasks are NOT strikethrough; only crossedOut tasks are strikethrough
     return `
-      <div class="task-item ${isCompleted ? 'completed' : ''} ${isCrossed ? 'crossed-out' : ''} ${isActive ? 'active-cursor' : ''}" 
+      <div class="task-item ${isCompleted ? 'completed' : ''} ${isCrossed ? 'crossed-out' : ''}" 
            data-task-id="${task.id}" 
            data-section-id="${sectionId}">
         
@@ -418,20 +488,19 @@ export class UIController {
         </div>
 
         <div class="task-content-wrapper">
-          <!-- Circular Badge Checkbox -->
+          <!-- Circular Badge Checkbox: solid #ffc114 with white checkmark when completed -->
           <div class="custom-checkbox" data-task-id="${task.id}" data-section-id="${sectionId}" title="Toggle">
             <svg viewBox="0 0 24 24">
               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
             </svg>
           </div>
 
-          <!-- Task Text Input -->
-          <input type="text" 
-                 class="task-input" 
-                 value="${this.escapeHTML(task.text || '')}" 
-                 placeholder="${t('addTaskPlaceholder')}" 
-                 data-task-id="${task.id}" 
-                 data-section-id="${sectionId}">
+          <!-- Task Text Input: Wraps onto next line without '...' -->
+          <textarea class="task-input" 
+                    rows="1"
+                    placeholder="${t('addTaskPlaceholder')}" 
+                    data-task-id="${task.id}" 
+                    data-section-id="${sectionId}">${this.escapeHTML(task.text || '')}</textarea>
 
           <!-- Desktop Delete Button (visible on hover) -->
           <button class="btn-task-delete-desktop" data-task-id="${task.id}" data-section-id="${sectionId}" title="${t('delete')}">
@@ -464,12 +533,12 @@ export class UIController {
     sectionInputs.forEach(input => {
       input.addEventListener('input', () => {
         const secId = input.getAttribute('data-section-id');
-        const cl = this.getActiveChecklist();
-        if (cl) {
-          const sec = cl.sections.find(s => s.id === secId);
+        const board = this.getActiveBoard();
+        if (board) {
+          const sec = board.sections.find(s => s.id === secId);
           if (sec) {
             sec.title = input.value;
-            cl.updatedAt = Date.now();
+            board.updatedAt = Date.now();
             this.save();
           }
         }
@@ -486,30 +555,36 @@ export class UIController {
       });
     });
 
-    // Task text input events & Cursor Logic
+    // Task text textarea events & Cursor Logic
     const taskInputs = this.sectionsContainer.querySelectorAll('.task-input');
     taskInputs.forEach(input => {
       const taskId = input.getAttribute('data-task-id');
       const sectionId = input.getAttribute('data-section-id');
 
-      // Focus: track active cursor
+      // Auto-resize height to fit wrapped content
+      const autoResize = () => {
+        input.style.height = 'auto';
+        input.style.height = `${input.scrollHeight}px`;
+      };
+      autoResize();
+
+      // Focus: track active cursor (NO yellow outline)
       input.addEventListener('focus', () => {
         this.activeTaskId = taskId;
         this.activeSectionId = sectionId;
-        this.highlightActiveTask(taskId);
-        this.updateCursorStatus();
       });
 
       // Text input change
       input.addEventListener('input', () => {
-        const cl = this.getActiveChecklist();
-        if (cl) {
-          const sec = cl.sections.find(s => s.id === sectionId);
+        autoResize();
+        const board = this.getActiveBoard();
+        if (board) {
+          const sec = board.sections.find(s => s.id === sectionId);
           if (sec) {
             const task = sec.tasks.find(t => t.id === taskId);
             if (task) {
               task.text = input.value;
-              cl.updatedAt = Date.now();
+              board.updatedAt = Date.now();
               this.save();
             }
           }
@@ -518,7 +593,7 @@ export class UIController {
 
       // Keydown: Enter creates next task, Backspace on empty deletes task
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
+        if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
           this.insertTaskBelow(sectionId, taskId);
         } else if (e.key === 'Backspace' && input.value.trim() === '') {
@@ -539,44 +614,23 @@ export class UIController {
       });
     });
 
-    // Swipe-to-delete touch gestures on mobile
+    // Mobile Swipe-to-delete gestures
     this.bindSwipeGestures();
-  }
-
-  highlightActiveTask(taskId) {
-    const items = this.sectionsContainer.querySelectorAll('.task-item');
-    items.forEach(item => {
-      if (item.getAttribute('data-task-id') === taskId) {
-        item.classList.add('active-cursor');
-      } else {
-        item.classList.remove('active-cursor');
-      }
-    });
-  }
-
-  updateCursorStatus() {
-    if (!this.cursorStatusPill) return;
-    if (this.activeTaskId) {
-      this.cursorStatusPill.style.display = 'inline-flex';
-      this.cursorStatusPill.textContent = t('cursorNotice');
-    } else {
-      this.cursorStatusPill.style.display = 'none';
-    }
   }
 
   // --- Task Operations & Cursor Logic ---
 
   toggleTaskCompleted(sectionId, taskId) {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
-    const sec = cl.sections.find(s => s.id === sectionId);
+    const board = this.getActiveBoard();
+    if (!board) return;
+    const sec = board.sections.find(s => s.id === sectionId);
     if (!sec) return;
     const task = sec.tasks.find(t => t.id === taskId);
     if (!task) return;
 
     task.completed = !task.completed;
-    cl.updatedAt = Date.now();
+    board.updatedAt = Date.now();
     this.save();
     this.renderOverview();
     this.renderDetail();
@@ -584,31 +638,29 @@ export class UIController {
 
   crossOutActiveTask() {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
+    const board = this.getActiveBoard();
+    if (!board) return;
 
     let targetTask = null;
-    let targetSec = null;
 
     if (this.activeTaskId) {
-      for (const sec of cl.sections) {
+      for (const sec of board.sections) {
         const found = sec.tasks.find(t => t.id === this.activeTaskId);
         if (found) {
           targetTask = found;
-          targetSec = sec;
           break;
         }
       }
     }
 
-    if (!targetTask && cl.sections[0]?.tasks.length > 0) {
-      targetSec = cl.sections[0];
-      targetTask = targetSec.tasks[targetSec.tasks.length - 1];
+    if (!targetTask && board.sections[0]?.tasks.length > 0) {
+      const sec = board.sections[0];
+      targetTask = sec.tasks[sec.tasks.length - 1];
     }
 
     if (targetTask) {
       targetTask.crossedOut = !targetTask.crossedOut;
-      cl.updatedAt = Date.now();
+      board.updatedAt = Date.now();
       this.save();
       this.renderDetail();
       this.showToast(targetTask.crossedOut ? t('crossOutTask') : t('uncrossTask'));
@@ -617,18 +669,17 @@ export class UIController {
 
   clearActiveTaskText() {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl || !this.activeTaskId) return;
+    const board = this.getActiveBoard();
+    if (!board || !this.activeTaskId) return;
 
-    for (const sec of cl.sections) {
+    for (const sec of board.sections) {
       const task = sec.tasks.find(t => t.id === this.activeTaskId);
       if (task) {
         task.text = '';
-        cl.updatedAt = Date.now();
+        board.updatedAt = Date.now();
         this.save();
         this.renderDetail();
         
-        // Re-focus the input
         setTimeout(() => {
           const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${task.id}"]`);
           if (input) input.focus();
@@ -641,9 +692,9 @@ export class UIController {
 
   insertTaskBelow(sectionId, currentTaskId) {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
-    const sec = cl.sections.find(s => s.id === sectionId);
+    const board = this.getActiveBoard();
+    if (!board) return;
+    const sec = board.sections.find(s => s.id === sectionId);
     if (!sec) return;
 
     const newTask = {
@@ -660,34 +711,35 @@ export class UIController {
       sec.tasks.push(newTask);
     }
 
-    cl.updatedAt = Date.now();
+    board.updatedAt = Date.now();
     this.activeTaskId = newTask.id;
     this.activeSectionId = sec.id;
     this.save();
     this.renderOverview();
     this.renderDetail();
 
-    // Focus the new task input
+    // Immediately focus input so keyboard opens up!
     setTimeout(() => {
       const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${newTask.id}"]`);
       if (input) {
         input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
     }, 50);
   }
 
   addTaskAtCursorOrBottom() {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
+    const board = this.getActiveBoard();
+    if (!board) return;
 
-    if (!cl.sections || cl.sections.length === 0) {
-      cl.sections = [{ id: generateId('sec'), title: '', tasks: [] }];
+    if (!board.sections || board.sections.length === 0) {
+      board.sections = [{ id: generateId('sec'), title: '', tasks: [] }];
     }
 
-    let targetSection = cl.sections[0];
+    let targetSection = board.sections[0];
     if (this.activeSectionId) {
-      const found = cl.sections.find(s => s.id === this.activeSectionId);
+      const found = board.sections.find(s => s.id === this.activeSectionId);
       if (found) targetSection = found;
     }
 
@@ -709,40 +761,44 @@ export class UIController {
       targetSection.tasks.push(newTask);
     }
 
-    cl.updatedAt = Date.now();
+    board.updatedAt = Date.now();
     this.activeTaskId = newTask.id;
     this.activeSectionId = targetSection.id;
     this.save();
     this.renderOverview();
     this.renderDetail();
 
+    // Immediately focus input so keyboard opens up!
     setTimeout(() => {
       const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${newTask.id}"]`);
-      if (input) input.focus();
+      if (input) {
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }, 50);
   }
 
   deleteTask(sectionId, taskId) {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
-    const sec = cl.sections.find(s => s.id === sectionId);
+    const board = this.getActiveBoard();
+    if (!board) return;
+    const sec = board.sections.find(s => s.id === sectionId);
     if (!sec) return;
 
     sec.tasks = sec.tasks.filter(t => t.id !== taskId);
     if (this.activeTaskId === taskId) {
       this.activeTaskId = null;
     }
-    cl.updatedAt = Date.now();
+    board.updatedAt = Date.now();
     this.save();
     this.renderOverview();
     this.renderDetail();
   }
 
   deleteTaskAndFocusPrev(sectionId, taskId) {
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
-    const sec = cl.sections.find(s => s.id === sectionId);
+    const board = this.getActiveBoard();
+    if (!board) return;
+    const sec = board.sections.find(s => s.id === sectionId);
     if (!sec) return;
 
     const curIndex = sec.tasks.findIndex(t => t.id === taskId);
@@ -755,7 +811,6 @@ export class UIController {
         const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${prevTask.id}"]`);
         if (input) {
           input.focus();
-          // Move cursor to end of text
           const len = input.value.length;
           input.setSelectionRange(len, len);
         }
@@ -765,8 +820,8 @@ export class UIController {
 
   addSection(title) {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
+    const board = this.getActiveBoard();
+    if (!board) return;
 
     const newSec = {
       id: generateId('sec'),
@@ -774,24 +829,27 @@ export class UIController {
       tasks: [{ id: generateId('task'), text: '', completed: false, crossedOut: false }]
     };
 
-    cl.sections.push(newSec);
-    cl.updatedAt = Date.now();
+    board.sections.push(newSec);
+    board.updatedAt = Date.now();
     this.save();
     this.renderDetail();
 
     setTimeout(() => {
       const input = this.sectionsContainer.querySelector(`.task-input[data-section-id="${newSec.id}"]`);
-      if (input) input.focus();
+      if (input) {
+        input.focus();
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
     }, 50);
   }
 
   deleteSection(sectionId) {
     this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl || cl.sections.length <= 1) return;
+    const board = this.getActiveBoard();
+    if (!board || board.sections.length <= 1) return;
 
-    cl.sections = cl.sections.filter(s => s.id !== sectionId);
-    cl.updatedAt = Date.now();
+    board.sections = board.sections.filter(s => s.id !== sectionId);
+    board.updatedAt = Date.now();
     this.save();
     this.renderOverview();
     this.renderDetail();
@@ -809,7 +867,6 @@ export class UIController {
 
       let startX = 0;
       let startY = 0;
-      let currentX = 0;
       let isSwiping = false;
 
       item.addEventListener('touchstart', (e) => {
@@ -823,10 +880,8 @@ export class UIController {
         const diffX = e.touches[0].clientX - startX;
         const diffY = e.touches[0].clientY - startY;
 
-        // If predominantly horizontal swipe to the left
         if (Math.abs(diffX) > Math.abs(diffY) && diffX < 0) {
           isSwiping = true;
-          // Apply rubber-band dampening past -80px
           let translateX = diffX;
           if (translateX < -80) {
             translateX = -80 + (diffX + 80) * 0.2;
@@ -841,19 +896,16 @@ export class UIController {
         const diffX = e.changedTouches[0].clientX - startX;
 
         if (diffX < -70) {
-          // Swipe trigger delete!
           contentWrapper.style.transform = 'translateX(-100%)';
           setTimeout(() => {
             this.deleteTask(sectionId, taskId);
             this.showToast(t('delete'));
           }, 200);
         } else {
-          // Reset position
           contentWrapper.style.transform = 'translateX(0)';
         }
       });
 
-      // Also handle direct tap on the red background action
       if (swipeAction) {
         swipeAction.addEventListener('click', () => {
           this.deleteTask(sectionId, taskId);
@@ -862,77 +914,29 @@ export class UIController {
     });
   }
 
-  // --- Checklist Actions (Pin, Delete, Rename, Duplicate, Clear Completed) ---
-  togglePinActiveChecklist() {
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
-    cl.pinned = !cl.pinned;
-    cl.updatedAt = Date.now();
+  // --- Board Actions (Pin/Unpin, Delete) ---
+  togglePinActiveBoard() {
+    const board = this.getActiveBoard();
+    if (!board) return;
+    board.pinned = !board.pinned;
+    board.updatedAt = Date.now();
     this.save();
     this.renderOverview();
     this.renderDetail();
-    this.showToast(cl.pinned ? t('pinnedChecklists') : t('unpin'));
+    this.showToast(board.pinned ? t('pin') : t('unpin'));
   }
 
-  duplicateActiveChecklist() {
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
-
-    const duplicated = JSON.parse(JSON.stringify(cl));
-    duplicated.id = generateId('cl');
-    duplicated.title = `${cl.title} (${t('duplicate')})`;
-    duplicated.pinned = false;
-    duplicated.createdAt = Date.now();
-    duplicated.updatedAt = Date.now();
-
-    // Re-generate IDs for sections and tasks
-    if (duplicated.sections) {
-      duplicated.sections.forEach(sec => {
-        sec.id = generateId('sec');
-        if (sec.tasks) {
-          sec.tasks.forEach(t => t.id = generateId('task'));
-        }
-      });
-    }
-
-    this.state.checklists.unshift(duplicated);
-    this.save();
-    this.openChecklist(duplicated.id);
-    this.showToast(t('duplicate'));
-  }
-
-  clearCompletedActiveChecklist() {
-    this.pushUndoState();
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
-
-    let clearedCount = 0;
-    cl.sections.forEach(sec => {
-      if (sec.tasks) {
-        const remaining = sec.tasks.filter(t => !t.completed);
-        clearedCount += (sec.tasks.length - remaining.length);
-        sec.tasks = remaining;
-      }
-    });
-
-    cl.updatedAt = Date.now();
-    this.save();
-    this.renderOverview();
-    this.renderDetail();
-    this.showToast(`${clearedCount} ${t('clearCompleted')}`);
-  }
-
-  confirmDeleteActiveChecklist() {
-    const cl = this.getActiveChecklist();
-    if (!cl) return;
+  confirmDeleteActiveBoard() {
+    const board = this.getActiveBoard();
+    if (!board) return;
 
     this.showConfirmDialog(
-      t('deleteChecklist'),
-      t('confirmDeleteChecklist'),
+      t('deleteBoard'),
+      t('confirmDeleteBoard'),
       t('delete'),
       () => {
-        this.state.checklists = this.state.checklists.filter(c => c.id !== cl.id);
-        this.state.activeChecklistId = this.state.checklists[0]?.id || null;
+        this.state.boards = this.state.boards.filter(b => b.id !== board.id);
+        this.state.activeBoardId = this.state.boards[0]?.id || null;
         this.save();
         this.renderOverview();
         if (window.innerWidth < 860) {
@@ -940,7 +944,7 @@ export class UIController {
         } else {
           this.renderDetail();
         }
-        this.showToast(t('deleteChecklist'));
+        this.showToast(t('deleteBoard'));
       }
     );
   }
@@ -990,7 +994,7 @@ export class UIController {
     }, duration);
   }
 
-  // --- Language & Static Translations Update ---
+  // --- Static Translations Update ---
   updateStaticTranslations() {
     document.querySelectorAll('[data-i18n]').forEach(el => {
       const key = el.getAttribute('data-i18n');
@@ -1010,6 +1014,8 @@ export class UIController {
     if (this.brandTitleEl) {
       this.brandTitleEl.textContent = t('appTitle');
     }
+
+    this.updateSortSubtitle();
   }
 
   // --- Event Binding ---
@@ -1024,10 +1030,10 @@ export class UIController {
     // Detail Title Input Change
     if (this.detailTitleInput) {
       this.detailTitleInput.addEventListener('input', () => {
-        const cl = this.getActiveChecklist();
-        if (cl) {
-          cl.title = this.detailTitleInput.value;
-          cl.updatedAt = Date.now();
+        const board = this.getActiveBoard();
+        if (board) {
+          board.title = this.detailTitleInput.value;
+          board.updatedAt = Date.now();
           this.save();
           this.renderOverview();
         }
@@ -1065,42 +1071,67 @@ export class UIController {
       if (this.detailMenuDropdown) this.detailMenuDropdown.classList.remove('open');
     });
 
-    // Detail Menu Actions
-    document.getElementById('menuItemPin')?.addEventListener('click', () => {
-      this.togglePinActiveChecklist();
-    });
-    document.getElementById('menuItemDuplicate')?.addEventListener('click', () => {
-      this.duplicateActiveChecklist();
-    });
-    document.getElementById('menuItemClearCompleted')?.addEventListener('click', () => {
-      this.clearCompletedActiveChecklist();
-    });
-    document.getElementById('menuItemDelete')?.addEventListener('click', () => {
-      this.confirmDeleteActiveChecklist();
+    // Main Menu Items (Select Boards, Sort By, Dark Mode, Settings)
+    document.getElementById('menuItemSelectBoards')?.addEventListener('click', () => {
+      if (this.mainMenuDropdown) this.mainMenuDropdown.classList.remove('open');
+      this.showToast(t('selectBoards'));
     });
 
-    // Main Menu Items
+    document.getElementById('menuItemSortBy')?.addEventListener('click', () => {
+      if (this.mainMenuDropdown) this.mainMenuDropdown.classList.remove('open');
+      this.cycleSortOrder();
+    });
+
+    document.getElementById('menuItemDarkMode')?.addEventListener('click', () => {
+      if (this.mainMenuDropdown) this.mainMenuDropdown.classList.remove('open');
+      this.toggleThemeDirectly();
+    });
+
     document.getElementById('menuItemSettings')?.addEventListener('click', () => {
+      if (this.mainMenuDropdown) this.mainMenuDropdown.classList.remove('open');
       this.populateSettingsForm();
       this.openModal(this.settingsModal);
     });
 
-    // FAB: Create New Checklist
+    // Detail Menu Actions: Pin/Unpin, Delete Board only
+    document.getElementById('menuItemPin')?.addEventListener('click', () => {
+      if (this.detailMenuDropdown) this.detailMenuDropdown.classList.remove('open');
+      this.togglePinActiveBoard();
+    });
+
+    document.getElementById('menuItemDelete')?.addEventListener('click', () => {
+      if (this.detailMenuDropdown) this.detailMenuDropdown.classList.remove('open');
+      this.confirmDeleteActiveBoard();
+    });
+
+    // Pinned Section Toggle Collapse / Expand
+    if (this.btnTogglePinned) {
+      this.btnTogglePinned.addEventListener('click', () => {
+        this.state.settings.pinnedCollapsed = !this.state.settings.pinnedCollapsed;
+        this.save();
+        if (this.pinnedContainer) {
+          this.pinnedContainer.classList.toggle('collapsed', this.state.settings.pinnedCollapsed);
+          this.btnTogglePinned.classList.toggle('collapsed', this.state.settings.pinnedCollapsed);
+        }
+      });
+    }
+
+    // FAB: Create New Board
     if (this.btnFab) {
       this.btnFab.addEventListener('click', () => {
-        const input = document.getElementById('newChecklistTitleInput');
+        const input = document.getElementById('newBoardTitleInput');
         if (input) input.value = '';
-        this.openModal(this.newChecklistModal);
+        this.openModal(this.newBoardModal);
         setTimeout(() => input?.focus(), 100);
       });
     }
 
-    // New Checklist Modal
-    document.getElementById('btnCreateChecklistConfirm')?.addEventListener('click', () => {
-      const input = document.getElementById('newChecklistTitleInput');
-      const title = input?.value.trim() || t('newChecklist');
-      const newCl = {
-        id: generateId('cl'),
+    // New Board Modal Confirm
+    document.getElementById('btnCreateBoardConfirm')?.addEventListener('click', () => {
+      const input = document.getElementById('newBoardTitleInput');
+      const title = input?.value.trim() || t('newBoard');
+      const newBoard = {
+        id: generateId('b'),
         title: title,
         pinned: false,
         createdAt: Date.now(),
@@ -1113,18 +1144,18 @@ export class UIController {
           }
         ]
       };
-      this.state.checklists.unshift(newCl);
+      this.state.boards.unshift(newBoard);
       this.save();
-      this.closeModal(this.newChecklistModal);
-      this.openChecklist(newCl.id);
-      this.showToast(t('newChecklist'));
+      this.closeModal(this.newBoardModal);
+      this.openBoard(newBoard.id);
+      this.showToast(t('newBoard'));
     });
 
-    document.getElementById('btnCreateChecklistCancel')?.addEventListener('click', () => {
-      this.closeModal(this.newChecklistModal);
+    document.getElementById('btnCreateBoardCancel')?.addEventListener('click', () => {
+      this.closeModal(this.newBoardModal);
     });
 
-    // Bottom Toolbar Actions
+    // Detail Bottom Toolbar Actions
     if (this.btnAddTask) {
       this.btnAddTask.addEventListener('click', () => {
         this.addTaskAtCursorOrBottom();
@@ -1179,19 +1210,17 @@ export class UIController {
 
     if (this.detailContent) {
       this.detailContent.addEventListener('scroll', () => {
-        if (this.state.activeChecklistId) {
+        if (this.state.activeBoardId) {
           if (!this.state.scrollPositions) this.state.scrollPositions = {};
-          this.state.scrollPositions[`cl_${this.state.activeChecklistId}`] = this.detailContent.scrollTop;
+          this.state.scrollPositions[`b_${this.state.activeBoardId}`] = this.detailContent.scrollTop;
         }
       }, { passive: true });
     }
 
-    // Save on beforeunload
     window.addEventListener('beforeunload', () => {
       this.saveScrollPosition();
     });
 
-    // Listen to OS theme changes if 'system' theme is active
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         if (this.state.settings.theme === 'system') {
@@ -1203,20 +1232,14 @@ export class UIController {
 
   // --- Settings Form & Logic ---
   populateSettingsForm() {
-    const sortSelect = document.getElementById('settingSortBy');
-    const themeSelect = document.getElementById('settingTheme');
     const fontSelect = document.getElementById('settingFontSize');
     const langSelect = document.getElementById('settingLanguage');
 
-    if (sortSelect) sortSelect.value = this.state.settings.sortBy || 'updatedAt_desc';
-    if (themeSelect) themeSelect.value = this.state.settings.theme || 'light';
     if (fontSelect) fontSelect.value = this.state.settings.fontSize || 'medium';
     if (langSelect) langSelect.value = this.state.settings.language || 'en';
   }
 
   bindSettingsEvents() {
-    const sortSelect = document.getElementById('settingSortBy');
-    const themeSelect = document.getElementById('settingTheme');
     const fontSelect = document.getElementById('settingFontSize');
     const langSelect = document.getElementById('settingLanguage');
     const btnCloseSettings = document.getElementById('btnCloseSettings');
@@ -1224,16 +1247,6 @@ export class UIController {
     const btnImport = document.getElementById('btnImportData');
     const importFileInput = document.getElementById('importFileInput');
     const btnResetAll = document.getElementById('btnResetAllData');
-
-    sortSelect?.addEventListener('change', () => {
-      this.state.settings.sortBy = sortSelect.value;
-      this.save();
-      this.renderOverview();
-    });
-
-    themeSelect?.addEventListener('change', () => {
-      this.applyTheme(themeSelect.value);
-    });
 
     fontSelect?.addEventListener('change', () => {
       this.applyFontSize(fontSelect.value);
@@ -1278,7 +1291,6 @@ export class UIController {
           return;
         }
 
-        // Ask whether to replace or merge
         const shouldReplace = window.confirm(`${t('importReplaceOrMerge')}\n\n[OK] = ${t('importMerge')}\n[Cancel] = ${t('importReplace')}`);
         this.state = mergeImportData(this.state, parsed, !shouldReplace);
         this.save();
