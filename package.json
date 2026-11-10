@@ -1,0 +1,23 @@
+{
+  "name": "checklists-webapp",
+  "version": "1.0.0",
+  "description": "Production-ready, highly polished Checklists Web Application & PWA for iPhone and Desktop",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve ."
+  },
+  "keywords": [
+    "pwa",
+    "checklists",
+    "todo",
+    "task-management",
+    "ios",
+    "mobile-first",
+    "bilingual",
+    "localstorage",
+    "offline-first"
+  ],
+  "author": "",
+  "license": "MIT"
+}
