@@ -1,7 +1,6 @@
 /**
  * UI Controller for Checklists Web Application
- * Handles DOM rendering, cursor tracking, gestures, undo stack, and interactions.
- * Configured for Boards structure matching design wireframe & reference images.
+ * Handles DOM rendering, selection mode, sort submenus, cursor tracking, gestures, undo stack, and interactions.
  */
 
 import { t, getLanguage, setLanguage, formatFullDate, formatTime, formatBoardTimestamp } from './i18n.js';
@@ -18,6 +17,10 @@ export class UIController {
     this.undoStack = [];
     this.maxUndoStack = 30;
 
+    // Selection mode state
+    this.isSelectionMode = false;
+    this.selectedBoardIds = new Set();
+
     // Cache DOM Elements
     this.appEl = document.getElementById('app');
     this.viewContainer = document.getElementById('viewContainer');
@@ -29,20 +32,31 @@ export class UIController {
     this.boardCounterEl = document.getElementById('boardCounter');
     this.btnMainMenu = document.getElementById('btnMainMenu');
     this.mainMenuDropdown = document.getElementById('mainMenuDropdown');
+    this.mainMenuRoot = document.getElementById('mainMenuRoot');
+    this.sortSubmenu = document.getElementById('sortSubmenu');
     this.menuSortSubtitle = document.getElementById('menuSortSubtitle');
+    this.sortSubmenuSubtitle = document.getElementById('sortSubmenuSubtitle');
     this.darkModeIcon = document.getElementById('darkModeIcon');
+
+    // Selection action bar elements
+    this.selectionActionBar = document.getElementById('selectionActionBar');
+    this.btnDeleteSelected = document.getElementById('btnDeleteSelected');
+    this.deleteSelectedText = document.getElementById('deleteSelectedText');
+    this.btnCancelSelection = document.getElementById('btnCancelSelection');
 
     // Master View lists
     this.pinnedSectionContainer = document.getElementById('pinnedSectionContainer');
     this.btnTogglePinned = document.getElementById('btnTogglePinned');
     this.pinnedContainer = document.getElementById('pinnedContainer');
     this.allContainer = document.getElementById('allContainer');
+    this.fabContainer = document.getElementById('fabContainer');
     this.btnFab = document.getElementById('btnFab');
 
     // Detail View elements
     this.btnBack = document.getElementById('btnBack');
     this.detailTitleInput = document.getElementById('detailTitleInput');
-    this.detailTimestampsEl = document.getElementById('detailTimestamps');
+    this.metaCreated = document.getElementById('metaCreated');
+    this.metaEdited = document.getElementById('metaEdited');
     this.btnUndo = document.getElementById('btnUndo');
     this.btnDetailMenu = document.getElementById('btnDetailMenu');
     this.detailMenuDropdown = document.getElementById('detailMenuDropdown');
@@ -50,8 +64,9 @@ export class UIController {
     this.pinMenuIcon = document.getElementById('pinMenuIcon');
     this.detailContent = document.getElementById('detailContent');
     this.sectionsContainer = document.getElementById('sectionsContainer');
+    this.detailToolbar = document.getElementById('detailToolbar');
 
-    // Detail Toolbar
+    // Detail Toolbar buttons
     this.btnAddTask = document.getElementById('btnAddTask');
     this.btnAddSection = document.getElementById('btnAddSection');
     this.btnCrossOut = document.getElementById('btnCrossOut');
@@ -69,7 +84,6 @@ export class UIController {
 
   init() {
     this.applyTheme(this.state.settings.theme);
-    this.applyFontSize(this.state.settings.fontSize);
     setLanguage(this.state.settings.language);
 
     this.bindEvents();
@@ -89,7 +103,28 @@ export class UIController {
 
     this.restoreScrollPositions();
     this.updateStaticTranslations();
-    this.updateSortSubtitle();
+    this.updateSortUI();
+    this.bindVisualViewport();
+  }
+
+  // --- Dynamic Keyboard Adaptation on Mobile ---
+  bindVisualViewport() {
+    if (window.visualViewport) {
+      const onViewportChange = () => {
+        if (!this.detailToolbar) return;
+        const currentViewport = window.visualViewport;
+        const offsetBottom = window.innerHeight - (currentViewport.height + currentViewport.offsetTop);
+        if (offsetBottom > 50) {
+          // Keyboard is open! Stick toolbar directly above keyboard
+          this.detailToolbar.style.bottom = `${offsetBottom}px`;
+        } else {
+          // Keyboard is closed
+          this.detailToolbar.style.bottom = '0px';
+        }
+      };
+      window.visualViewport.addEventListener('resize', onViewportChange);
+      window.visualViewport.addEventListener('scroll', onViewportChange);
+    }
   }
 
   // --- State Persistence & Undo ---
@@ -180,7 +215,6 @@ export class UIController {
     }
     document.documentElement.setAttribute('data-theme', effective);
     
-    // Header safe area and theme-color matches the background of the theme
     const themeBg = effective === 'dark' ? '#1a202c' : '#f8f9fb';
     document.documentElement.style.backgroundColor = themeBg;
     document.body.style.backgroundColor = themeBg;
@@ -198,56 +232,141 @@ export class UIController {
     this.showToast(`${t('darkMode')}: ${next === 'dark' ? t('themeDark') : t('themeLight')}`);
   }
 
-  applyFontSize(size) {
-    this.state.settings.fontSize = size;
-    document.documentElement.setAttribute('data-font-size', size);
-    this.save();
-  }
-
-  // --- Sorting ---
+  // --- Sorting & Submenu Handling ---
   getSortedBoards(boards) {
     const list = [...boards];
-    const sortBy = this.state.settings.sortBy || 'updatedAt_desc';
+    const sortBy = this.state.settings.sortBy || 'default';
+    const sortOrder = this.state.settings.sortOrder || 'desc';
+    const mult = sortOrder === 'asc' ? 1 : -1;
 
-    if (sortBy === 'updatedAt_desc') {
-      return list.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    if (sortBy === 'default' || sortBy === 'updatedAt') {
+      return list.sort((a, b) => mult * ((a.updatedAt || 0) - (b.updatedAt || 0)));
     }
-    if (sortBy === 'createdAt_desc') {
-      return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (sortBy === 'createdAt') {
+      return list.sort((a, b) => mult * ((a.createdAt || 0) - (b.createdAt || 0)));
     }
-    if (sortBy === 'title_asc') {
-      return list.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+    if (sortBy === 'title') {
+      return list.sort((a, b) => mult * (a.title || '').localeCompare(b.title || ''));
     }
     return list;
   }
 
-  cycleSortOrder() {
-    const current = this.state.settings.sortBy || 'updatedAt_desc';
-    let next = 'updatedAt_desc';
-    if (current === 'updatedAt_desc') next = 'createdAt_desc';
-    else if (current === 'createdAt_desc') next = 'title_asc';
-    else if (current === 'title_asc') next = 'manual';
-    else next = 'updatedAt_desc';
-
-    this.state.settings.sortBy = next;
+  setSortCriteria(criteria) {
+    this.state.settings.sortBy = criteria;
     this.save();
-    this.updateSortSubtitle();
+    this.updateSortUI();
     this.renderOverview();
-    this.showToast(`${t('sortBy')}: ${this.getSortLabel(next)}`);
   }
 
-  getSortLabel(sortBy) {
-    if (sortBy === 'updatedAt_desc') return t('sortDefault');
-    if (sortBy === 'createdAt_desc') return t('sortCreated');
-    if (sortBy === 'title_asc') return t('sortTitle');
+  setSortOrder(order) {
+    this.state.settings.sortOrder = order;
+    this.save();
+    this.updateSortUI();
+    this.renderOverview();
+  }
+
+  getSortLabel() {
+    const sortBy = this.state.settings.sortBy || 'default';
+    if (sortBy === 'default') return t('sortDefault');
+    if (sortBy === 'updatedAt') return t('sortDateEdited');
+    if (sortBy === 'createdAt') return t('sortDateCreated');
+    if (sortBy === 'title') return t('sortTitle');
     return t('sortDefault');
   }
 
-  updateSortSubtitle() {
-    if (this.menuSortSubtitle) {
-      const sortBy = this.state.settings.sortBy || 'updatedAt_desc';
-      this.menuSortSubtitle.textContent = this.getSortLabel(sortBy);
+  updateSortUI() {
+    const label = this.getSortLabel();
+    if (this.menuSortSubtitle) this.menuSortSubtitle.textContent = label;
+    if (this.sortSubmenuSubtitle) this.sortSubmenuSubtitle.textContent = label;
+
+    const currentSort = this.state.settings.sortBy || 'default';
+    const currentOrder = this.state.settings.sortOrder || 'desc';
+
+    document.querySelectorAll('.sort-option-item[data-sort]').forEach(el => {
+      const s = el.getAttribute('data-sort');
+      el.classList.toggle('selected', s === currentSort);
+    });
+
+    document.querySelectorAll('.sort-option-item[data-order]').forEach(el => {
+      const o = el.getAttribute('data-order');
+      el.classList.toggle('selected', o === currentOrder);
+    });
+  }
+
+  openSortSubmenu() {
+    if (this.mainMenuRoot) this.mainMenuRoot.style.display = 'none';
+    if (this.sortSubmenu) this.sortSubmenu.style.display = 'flex';
+  }
+
+  closeSortSubmenu() {
+    if (this.sortSubmenu) this.sortSubmenu.style.display = 'none';
+    if (this.mainMenuRoot) this.mainMenuRoot.style.display = 'block';
+  }
+
+  // --- Selection Mode Logic ---
+  startSelectionMode() {
+    this.isSelectionMode = true;
+    this.selectedBoardIds.clear();
+
+    if (this.masterView) this.masterView.classList.add('selection-mode');
+    if (this.btnMainMenu) this.btnMainMenu.style.display = 'none';
+    if (this.selectionActionBar) this.selectionActionBar.style.display = 'flex';
+    if (this.fabContainer) this.fabContainer.style.display = 'none';
+
+    this.updateSelectionActionBar();
+    this.renderOverview();
+  }
+
+  endSelectionMode() {
+    this.isSelectionMode = false;
+    this.selectedBoardIds.clear();
+
+    if (this.masterView) this.masterView.classList.remove('selection-mode');
+    if (this.btnMainMenu) this.btnMainMenu.style.display = 'inline-flex';
+    if (this.selectionActionBar) this.selectionActionBar.style.display = 'none';
+    if (this.fabContainer) this.fabContainer.style.display = 'block';
+
+    this.renderOverview();
+  }
+
+  toggleBoardSelection(id) {
+    if (this.selectedBoardIds.has(id)) {
+      this.selectedBoardIds.delete(id);
+    } else {
+      this.selectedBoardIds.add(id);
     }
+    this.updateSelectionActionBar();
+    this.renderOverview();
+  }
+
+  updateSelectionActionBar() {
+    const count = this.selectedBoardIds.size;
+    if (this.deleteSelectedText) {
+      this.deleteSelectedText.textContent = `${t('delete')} (${count})`;
+    }
+    if (this.btnDeleteSelected) {
+      this.btnDeleteSelected.disabled = count === 0;
+    }
+  }
+
+  confirmDeleteSelectedBoards() {
+    const count = this.selectedBoardIds.size;
+    if (count === 0) return;
+
+    this.showConfirmDialog(
+      t('deleteSelected'),
+      t('confirmDeleteSelected', count),
+      t('delete'),
+      () => {
+        this.state.boards = this.state.boards.filter(b => !this.selectedBoardIds.has(b.id));
+        if (this.selectedBoardIds.has(this.state.activeBoardId)) {
+          this.state.activeBoardId = this.state.boards[0]?.id || null;
+        }
+        this.save();
+        this.endSelectionMode();
+        this.showToast(t('deleteSelected'));
+      }
+    );
   }
 
   // --- View Switching ---
@@ -279,6 +398,7 @@ export class UIController {
   }
 
   closeDetail() {
+    this.cleanUpEmptyTasks();
     this.saveScrollPosition();
     this.viewContainer.classList.remove('detail-active');
     this.state.activeBoardId = null;
@@ -287,13 +407,33 @@ export class UIController {
     this.renderOverview();
   }
 
+  // --- Automatic Cleanup of Empty Tasks ---
+  cleanUpEmptyTasks() {
+    const board = this.getActiveBoard();
+    if (!board || !board.sections) return;
+
+    let modified = false;
+    for (const sec of board.sections) {
+      if (sec.tasks) {
+        const originalCount = sec.tasks.length;
+        sec.tasks = sec.tasks.filter(t => t.text !== undefined && t.text.trim() !== '');
+        if (sec.tasks.length !== originalCount) {
+          modified = true;
+        }
+      }
+    }
+
+    if (modified) {
+      this.save();
+    }
+  }
+
   // --- Rendering Overview (Master View) ---
   renderOverview() {
     const all = this.getSortedBoards(this.state.boards || []);
     const pinned = all.filter(b => b.pinned);
     const unpinned = all.filter(b => !b.pinned);
 
-    // Update Counter (stands below the title header above boards)
     if (this.boardCounterEl) {
       this.boardCounterEl.textContent = t('boardCounter', all.length);
     }
@@ -304,7 +444,6 @@ export class UIController {
         this.pinnedSectionContainer.style.display = 'block';
         this.pinnedContainer.innerHTML = pinned.map(b => this.createBoardRowHTML(b)).join('');
         
-        // Handle collapse state
         const isCollapsed = !!this.state.settings.pinnedCollapsed;
         if (isCollapsed) {
           this.pinnedContainer.classList.add('collapsed');
@@ -326,7 +465,7 @@ export class UIController {
           <div class="empty-state">
             <div class="empty-state-icon">
               <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
               </svg>
             </div>
             <div class="empty-state-title">${t('noBoardsYet')}</div>
@@ -343,23 +482,19 @@ export class UIController {
     rows.forEach(row => {
       row.addEventListener('click', (e) => {
         const id = row.getAttribute('data-id');
-        this.openBoard(id);
+        if (this.isSelectionMode) {
+          this.toggleBoardSelection(id);
+        } else {
+          this.openBoard(id);
+        }
       });
     });
   }
 
-  /**
-   * Generates Board row HTML matching Image 1 & Image 2 wireframe:
-   * - Board title (bold, wraps onto next line without ellipsis)
-   * - Timestamp underneath: Only time if today, only Yesterday if yesterday, date like 28.10.2026 if earlier.
-   * - NO "edited" text anywhere.
-   * - Followed by task / section preview.
-   * - NO "done" counter badge.
-   */
   createBoardRowHTML(board) {
     const isActive = board.id === this.state.activeBoardId;
+    const isSelected = this.selectedBoardIds.has(board.id);
     
-    // Find preview text: first task text, or first section title
     let previewText = '';
     if (board.sections) {
       for (const sec of board.sections) {
@@ -379,11 +514,20 @@ export class UIController {
     const timestampStr = formatBoardTimestamp(board.updatedAt || board.createdAt);
 
     return `
-      <div class="board-row ${isActive ? 'active' : ''}" data-id="${board.id}">
-        <div class="board-row-title">${this.escapeHTML(board.title || t('newBoard'))}</div>
-        <div class="board-row-meta">
-          <span class="board-timestamp">${this.escapeHTML(timestampStr)}</span>
-          ${previewText ? `<span class="board-preview-text">${this.escapeHTML(previewText)}</span>` : ''}
+      <div class="board-row ${isActive ? 'active' : ''} ${isSelected ? 'selected' : ''}" data-id="${board.id}">
+        <!-- Selection checkbox for selection mode -->
+        <div class="board-select-checkbox">
+          <svg viewBox="0 0 24 24">
+            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+          </svg>
+        </div>
+
+        <div class="board-row-content">
+          <div class="board-row-title">${this.escapeHTML(board.title || t('newBoard'))}</div>
+          <div class="board-row-meta">
+            <span class="board-timestamp">${this.escapeHTML(timestampStr)}</span>
+            ${previewText ? `<span class="board-preview-text">${this.escapeHTML(previewText)}</span>` : ''}
+          </div>
         </div>
       </div>
     `;
@@ -394,7 +538,8 @@ export class UIController {
     const board = this.getActiveBoard();
     if (!board) {
       if (this.detailTitleInput) this.detailTitleInput.value = '';
-      if (this.detailTimestampsEl) this.detailTimestampsEl.textContent = '';
+      if (this.metaCreated) this.metaCreated.textContent = '';
+      if (this.metaEdited) this.metaEdited.textContent = '';
       if (this.sectionsContainer) {
         this.sectionsContainer.innerHTML = `
           <div class="empty-state" style="padding-top: 100px;">
@@ -410,61 +555,66 @@ export class UIController {
       this.detailTitleInput.value = board.title || '';
     }
 
-    // Exact Timestamps: "Created 09. November 2024 | Edited 10. November 2026 at 16:30"
-    if (this.detailTimestampsEl) {
+    // Stacked Timestamps untereinander
+    if (this.metaCreated) {
       const createdStr = formatFullDate(board.createdAt || Date.now());
+      this.metaCreated.textContent = t('createdOn', createdStr);
+    }
+    if (this.metaEdited) {
       const editedDateStr = formatFullDate(board.updatedAt || Date.now());
       const editedTimeStr = formatTime(board.updatedAt || Date.now());
-      this.detailTimestampsEl.textContent = `${t('createdOn', createdStr)} | ${t('editedOn', editedDateStr, editedTimeStr)}`;
+      this.metaEdited.textContent = t('editedOn', editedDateStr, editedTimeStr);
     }
 
-    // Update Pin/Unpin menu item label and icon
+    // Pin/Unpin menu item label and icon
     if (this.pinMenuLabel) {
       this.pinMenuLabel.textContent = board.pinned ? t('unpin') : t('pin');
     }
     if (this.pinMenuIcon) {
       if (board.pinned) {
-        // Unpin icon
         this.pinMenuIcon.innerHTML = `<path d="M16 9V4l1 0V2H7v2l1 0v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z M2 2l20 20-1.41 1.41L13.8 16.6l-.8.8v6l-1 1-1-1v-6.97L5 14v-2c.6-.6 1.1-1.3 1.3-2.1L2 2z"/>`;
       } else {
-        // Pin icon
         this.pinMenuIcon.innerHTML = `<path d="M16 9V4l1 0V2H7v2l1 0v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z"/>`;
       }
     }
 
     // Render Sections and tasks
     if (this.sectionsContainer) {
-      if (!board.sections || board.sections.length === 0) {
-        board.sections = [{ id: generateId('sec'), title: '', tasks: [] }];
+      const hasSections = board.sections && board.sections.length > 0;
+      const totalTasks = hasSections ? board.sections.reduce((acc, s) => acc + (s.tasks ? s.tasks.length : 0), 0) : 0;
+
+      if (!hasSections || totalTasks === 0) {
+        // Completely empty state showing "Add your task"
+        this.sectionsContainer.innerHTML = `
+          <div class="empty-state" style="padding-top: 80px;">
+            <div class="empty-state-title" style="color: var(--text-muted); font-size: 1.25rem;">${t('addYourTask')}</div>
+          </div>
+        `;
+      } else {
+        this.sectionsContainer.innerHTML = board.sections.map((section) => `
+          <div class="task-section" data-section-id="${section.id}">
+            <div class="task-section-header">
+              <input type="text" 
+                     class="section-title-input" 
+                     value="${this.escapeHTML(section.title || '')}" 
+                     placeholder="${t('sectionTitlePlaceholder')}"
+                     data-section-id="${section.id}">
+              ${board.sections.length > 1 ? `
+                <button class="btn-section-delete" data-section-id="${section.id}" title="${t('delete')}">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                  </svg>
+                </button>
+              ` : ''}
+            </div>
+            <div class="tasks-container" data-section-id="${section.id}">
+              ${(section.tasks && section.tasks.length > 0) ? section.tasks.map(task => this.createTaskItemHTML(task, section.id)).join('') : ''}
+            </div>
+          </div>
+        `).join('');
+
+        this.bindTaskSectionEvents();
       }
-
-      this.sectionsContainer.innerHTML = board.sections.map((section) => `
-        <div class="task-section" data-section-id="${section.id}">
-          <div class="task-section-header">
-            <input type="text" 
-                   class="section-title-input" 
-                   value="${this.escapeHTML(section.title || '')}" 
-                   placeholder="${t('sectionTitlePlaceholder')}"
-                   data-section-id="${section.id}">
-            ${board.sections.length > 1 ? `
-              <button class="btn-section-delete" data-section-id="${section.id}" title="${t('delete')}">
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                </svg>
-              </button>
-            ` : ''}
-          </div>
-          <div class="tasks-container" data-section-id="${section.id}">
-            ${(section.tasks && section.tasks.length > 0) ? section.tasks.map(task => this.createTaskItemHTML(task, section.id)).join('') : `
-              <div class="empty-state" style="padding: 12px 0 8px 0;">
-                <div class="empty-state-sub" style="font-size: 0.85rem;">${t('noTasksInSection')}</div>
-              </div>
-            `}
-          </div>
-        </div>
-      `).join('');
-
-      this.bindTaskSectionEvents();
     }
 
     this.updateUndoButtonState();
@@ -474,13 +624,12 @@ export class UIController {
     const isCompleted = !!task.completed;
     const isCrossed = !!task.crossedOut;
 
-    // Checked tasks are NOT strikethrough; only crossedOut tasks are strikethrough
     return `
       <div class="task-item ${isCompleted ? 'completed' : ''} ${isCrossed ? 'crossed-out' : ''}" 
            data-task-id="${task.id}" 
            data-section-id="${sectionId}">
         
-        <!-- Swipe Delete Action Background -->
+        <!-- Swipe Delete Action Underneath for Mobile -->
         <div class="task-swipe-action" data-task-id="${task.id}" data-section-id="${sectionId}">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -488,21 +637,19 @@ export class UIController {
         </div>
 
         <div class="task-content-wrapper">
-          <!-- Circular Badge Checkbox: solid #ffc114 with white checkmark when completed -->
           <div class="custom-checkbox" data-task-id="${task.id}" data-section-id="${sectionId}" title="Toggle">
             <svg viewBox="0 0 24 24">
               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
             </svg>
           </div>
 
-          <!-- Task Text Input: Wraps onto next line without '...' -->
+          <!-- Auto-resizing textarea with NO manual resize handle and NO placeholder -->
           <textarea class="task-input" 
                     rows="1"
-                    placeholder="${t('addTaskPlaceholder')}" 
                     data-task-id="${task.id}" 
                     data-section-id="${sectionId}">${this.escapeHTML(task.text || '')}</textarea>
 
-          <!-- Desktop Delete Button (visible on hover) -->
+          <!-- Desktop Delete Button (visible only on large screens on hover) -->
           <button class="btn-task-delete-desktop" data-task-id="${task.id}" data-section-id="${sectionId}" title="${t('delete')}">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
@@ -534,7 +681,7 @@ export class UIController {
       input.addEventListener('input', () => {
         const secId = input.getAttribute('data-section-id');
         const board = this.getActiveBoard();
-        if (board) {
+        if (board && board.sections) {
           const sec = board.sections.find(s => s.id === secId);
           if (sec) {
             sec.title = input.value;
@@ -555,32 +702,38 @@ export class UIController {
       });
     });
 
-    // Task text textarea events & Cursor Logic
+    // Task text textarea events
     const taskInputs = this.sectionsContainer.querySelectorAll('.task-input');
     taskInputs.forEach(input => {
       const taskId = input.getAttribute('data-task-id');
       const sectionId = input.getAttribute('data-section-id');
 
-      // Auto-resize height to fit wrapped content
       const autoResize = () => {
         input.style.height = 'auto';
         input.style.height = `${input.scrollHeight}px`;
       };
       autoResize();
 
-      // Focus: track active cursor (NO yellow outline)
+      // Focus: track active cursor
       input.addEventListener('focus', () => {
         this.activeTaskId = taskId;
         this.activeSectionId = sectionId;
+      });
+
+      // Blur: automatically delete if task text is empty string!
+      input.addEventListener('blur', () => {
+        if (input.value.trim() === '') {
+          this.deleteTask(sectionId, taskId, false);
+        }
       });
 
       // Text input change
       input.addEventListener('input', () => {
         autoResize();
         const board = this.getActiveBoard();
-        if (board) {
+        if (board && board.sections) {
           const sec = board.sections.find(s => s.id === sectionId);
-          if (sec) {
+          if (sec && sec.tasks) {
             const task = sec.tasks.find(t => t.id === taskId);
             if (task) {
               task.text = input.value;
@@ -614,18 +767,16 @@ export class UIController {
       });
     });
 
-    // Mobile Swipe-to-delete gestures
     this.bindSwipeGestures();
   }
 
-  // --- Task Operations & Cursor Logic ---
-
+  // --- Task Operations ---
   toggleTaskCompleted(sectionId, taskId) {
     this.pushUndoState();
     const board = this.getActiveBoard();
-    if (!board) return;
+    if (!board || !board.sections) return;
     const sec = board.sections.find(s => s.id === sectionId);
-    if (!sec) return;
+    if (!sec || !sec.tasks) return;
     const task = sec.tasks.find(t => t.id === taskId);
     if (!task) return;
 
@@ -639,21 +790,23 @@ export class UIController {
   crossOutActiveTask() {
     this.pushUndoState();
     const board = this.getActiveBoard();
-    if (!board) return;
+    if (!board || !board.sections) return;
 
     let targetTask = null;
 
     if (this.activeTaskId) {
       for (const sec of board.sections) {
-        const found = sec.tasks.find(t => t.id === this.activeTaskId);
-        if (found) {
-          targetTask = found;
-          break;
+        if (sec.tasks) {
+          const found = sec.tasks.find(t => t.id === this.activeTaskId);
+          if (found) {
+            targetTask = found;
+            break;
+          }
         }
       }
     }
 
-    if (!targetTask && board.sections[0]?.tasks.length > 0) {
+    if (!targetTask && board.sections[0]?.tasks?.length > 0) {
       const sec = board.sections[0];
       targetTask = sec.tasks[sec.tasks.length - 1];
     }
@@ -670,22 +823,24 @@ export class UIController {
   clearActiveTaskText() {
     this.pushUndoState();
     const board = this.getActiveBoard();
-    if (!board || !this.activeTaskId) return;
+    if (!board || !board.sections || !this.activeTaskId) return;
 
     for (const sec of board.sections) {
-      const task = sec.tasks.find(t => t.id === this.activeTaskId);
-      if (task) {
-        task.text = '';
-        board.updatedAt = Date.now();
-        this.save();
-        this.renderDetail();
-        
-        setTimeout(() => {
-          const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${task.id}"]`);
-          if (input) input.focus();
-        }, 50);
-        this.showToast(t('clearText'));
-        break;
+      if (sec.tasks) {
+        const task = sec.tasks.find(t => t.id === this.activeTaskId);
+        if (task) {
+          task.text = '';
+          board.updatedAt = Date.now();
+          this.save();
+          this.renderDetail();
+          
+          setTimeout(() => {
+            const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${task.id}"]`);
+            if (input) input.focus();
+          }, 50);
+          this.showToast(t('clearText'));
+          break;
+        }
       }
     }
   }
@@ -693,9 +848,10 @@ export class UIController {
   insertTaskBelow(sectionId, currentTaskId) {
     this.pushUndoState();
     const board = this.getActiveBoard();
-    if (!board) return;
+    if (!board || !board.sections) return;
     const sec = board.sections.find(s => s.id === sectionId);
     if (!sec) return;
+    if (!sec.tasks) sec.tasks = [];
 
     const newTask = {
       id: generateId('task'),
@@ -715,10 +871,8 @@ export class UIController {
     this.activeTaskId = newTask.id;
     this.activeSectionId = sec.id;
     this.save();
-    this.renderOverview();
     this.renderDetail();
 
-    // Immediately focus input so keyboard opens up!
     setTimeout(() => {
       const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${newTask.id}"]`);
       if (input) {
@@ -733,8 +887,13 @@ export class UIController {
     const board = this.getActiveBoard();
     if (!board) return;
 
+    // If no sections exist yet, automatically generate one with placeholder Section name (e.g Wednesday)
     if (!board.sections || board.sections.length === 0) {
-      board.sections = [{ id: generateId('sec'), title: '', tasks: [] }];
+      board.sections = [{
+        id: generateId('sec'),
+        title: '',
+        tasks: []
+      }];
     }
 
     let targetSection = board.sections[0];
@@ -742,6 +901,7 @@ export class UIController {
       const found = board.sections.find(s => s.id === this.activeSectionId);
       if (found) targetSection = found;
     }
+    if (!targetSection.tasks) targetSection.tasks = [];
 
     const newTask = {
       id: generateId('task'),
@@ -765,7 +925,6 @@ export class UIController {
     this.activeTaskId = newTask.id;
     this.activeSectionId = targetSection.id;
     this.save();
-    this.renderOverview();
     this.renderDetail();
 
     // Immediately focus input so keyboard opens up!
@@ -778,12 +937,12 @@ export class UIController {
     }, 50);
   }
 
-  deleteTask(sectionId, taskId) {
-    this.pushUndoState();
+  deleteTask(sectionId, taskId, pushHistory = true) {
+    if (pushHistory) this.pushUndoState();
     const board = this.getActiveBoard();
-    if (!board) return;
+    if (!board || !board.sections) return;
     const sec = board.sections.find(s => s.id === sectionId);
-    if (!sec) return;
+    if (!sec || !sec.tasks) return;
 
     sec.tasks = sec.tasks.filter(t => t.id !== taskId);
     if (this.activeTaskId === taskId) {
@@ -791,15 +950,14 @@ export class UIController {
     }
     board.updatedAt = Date.now();
     this.save();
-    this.renderOverview();
     this.renderDetail();
   }
 
   deleteTaskAndFocusPrev(sectionId, taskId) {
     const board = this.getActiveBoard();
-    if (!board) return;
+    if (!board || !board.sections) return;
     const sec = board.sections.find(s => s.id === sectionId);
-    if (!sec) return;
+    if (!sec || !sec.tasks) return;
 
     const curIndex = sec.tasks.findIndex(t => t.id === taskId);
     const prevTask = curIndex > 0 ? sec.tasks[curIndex - 1] : null;
@@ -822,6 +980,7 @@ export class UIController {
     this.pushUndoState();
     const board = this.getActiveBoard();
     if (!board) return;
+    if (!board.sections) board.sections = [];
 
     const newSec = {
       id: generateId('sec'),
@@ -846,7 +1005,7 @@ export class UIController {
   deleteSection(sectionId) {
     this.pushUndoState();
     const board = this.getActiveBoard();
-    if (!board || board.sections.length <= 1) return;
+    if (!board || !board.sections || board.sections.length <= 1) return;
 
     board.sections = board.sections.filter(s => s.id !== sectionId);
     board.updatedAt = Date.now();
@@ -914,7 +1073,7 @@ export class UIController {
     });
   }
 
-  // --- Board Actions (Pin/Unpin, Delete) ---
+  // --- Board Actions ---
   togglePinActiveBoard() {
     const board = this.getActiveBoard();
     if (!board) return;
@@ -949,7 +1108,7 @@ export class UIController {
     );
   }
 
-  // --- Modals, Dropdowns & Dialogs ---
+  // --- Modals & Dialogs ---
   showConfirmDialog(title, message, confirmBtnText, onConfirm) {
     const titleEl = document.getElementById('confirmModalTitle');
     const msgEl = document.getElementById('confirmModalMessage');
@@ -1015,7 +1174,7 @@ export class UIController {
       this.brandTitleEl.textContent = t('appTitle');
     }
 
-    this.updateSortSubtitle();
+    this.updateSortUI();
   }
 
   // --- Event Binding ---
@@ -1051,6 +1210,7 @@ export class UIController {
     if (this.btnMainMenu && this.mainMenuDropdown) {
       this.btnMainMenu.addEventListener('click', (e) => {
         e.stopPropagation();
+        this.closeSortSubmenu();
         this.mainMenuDropdown.classList.toggle('open');
         if (this.detailMenuDropdown) this.detailMenuDropdown.classList.remove('open');
       });
@@ -1071,15 +1231,38 @@ export class UIController {
       if (this.detailMenuDropdown) this.detailMenuDropdown.classList.remove('open');
     });
 
-    // Main Menu Items (Select Boards, Sort By, Dark Mode, Settings)
+    // Main Menu Items
     document.getElementById('menuItemSelectBoards')?.addEventListener('click', () => {
       if (this.mainMenuDropdown) this.mainMenuDropdown.classList.remove('open');
-      this.showToast(t('selectBoards'));
+      this.startSelectionMode();
     });
 
-    document.getElementById('menuItemSortBy')?.addEventListener('click', () => {
-      if (this.mainMenuDropdown) this.mainMenuDropdown.classList.remove('open');
-      this.cycleSortOrder();
+    document.getElementById('menuItemSortBy')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.openSortSubmenu();
+    });
+
+    document.getElementById('btnBackToSortMenu')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.closeSortSubmenu();
+    });
+
+    // Submenu Sort criteria click events
+    document.querySelectorAll('.sort-option-item[data-sort]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const criteria = el.getAttribute('data-sort');
+        this.setSortCriteria(criteria);
+      });
+    });
+
+    // Submenu Sort order click events
+    document.querySelectorAll('.sort-option-item[data-order]').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const order = el.getAttribute('data-order');
+        this.setSortOrder(order);
+      });
     });
 
     document.getElementById('menuItemDarkMode')?.addEventListener('click', () => {
@@ -1093,7 +1276,20 @@ export class UIController {
       this.openModal(this.settingsModal);
     });
 
-    // Detail Menu Actions: Pin/Unpin, Delete Board only
+    // Selection Action Bar Events
+    if (this.btnDeleteSelected) {
+      this.btnDeleteSelected.addEventListener('click', () => {
+        this.confirmDeleteSelectedBoards();
+      });
+    }
+
+    if (this.btnCancelSelection) {
+      this.btnCancelSelection.addEventListener('click', () => {
+        this.endSelectionMode();
+      });
+    }
+
+    // Detail Menu Actions
     document.getElementById('menuItemPin')?.addEventListener('click', () => {
       if (this.detailMenuDropdown) this.detailMenuDropdown.classList.remove('open');
       this.togglePinActiveBoard();
@@ -1122,7 +1318,12 @@ export class UIController {
         const input = document.getElementById('newBoardTitleInput');
         if (input) input.value = '';
         this.openModal(this.newBoardModal);
-        setTimeout(() => input?.focus(), 100);
+        // Automatically focus and open mobile keyboard!
+        setTimeout(() => {
+          if (input) {
+            input.focus();
+          }
+        }, 150);
       });
     }
 
@@ -1136,13 +1337,7 @@ export class UIController {
         pinned: false,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        sections: [
-          {
-            id: generateId('sec'),
-            title: '',
-            tasks: [{ id: generateId('task'), text: '', completed: false, crossedOut: false }]
-          }
-        ]
+        sections: [] // Completely empty sections by default as requested!
       };
       this.state.boards.unshift(newBoard);
       this.save();
@@ -1167,7 +1362,7 @@ export class UIController {
         const input = document.getElementById('newSectionTitleInput');
         if (input) input.value = '';
         this.openModal(this.newSectionModal);
-        setTimeout(() => input?.focus(), 100);
+        setTimeout(() => input?.focus(), 150);
       });
     }
 
@@ -1218,6 +1413,7 @@ export class UIController {
     }
 
     window.addEventListener('beforeunload', () => {
+      this.cleanUpEmptyTasks();
       this.saveScrollPosition();
     });
 
@@ -1232,25 +1428,17 @@ export class UIController {
 
   // --- Settings Form & Logic ---
   populateSettingsForm() {
-    const fontSelect = document.getElementById('settingFontSize');
     const langSelect = document.getElementById('settingLanguage');
-
-    if (fontSelect) fontSelect.value = this.state.settings.fontSize || 'medium';
     if (langSelect) langSelect.value = this.state.settings.language || 'en';
   }
 
   bindSettingsEvents() {
-    const fontSelect = document.getElementById('settingFontSize');
     const langSelect = document.getElementById('settingLanguage');
     const btnCloseSettings = document.getElementById('btnCloseSettings');
     const btnExport = document.getElementById('btnExportData');
     const btnImport = document.getElementById('btnImportData');
     const importFileInput = document.getElementById('importFileInput');
     const btnResetAll = document.getElementById('btnResetAllData');
-
-    fontSelect?.addEventListener('change', () => {
-      this.applyFontSize(fontSelect.value);
-    });
 
     langSelect?.addEventListener('change', () => {
       const newLang = langSelect.value;
@@ -1267,13 +1455,11 @@ export class UIController {
       this.closeModal(this.settingsModal);
     });
 
-    // Export Data
     btnExport?.addEventListener('click', () => {
       exportDataToFile(this.state);
       this.showToast(t('exportData'));
     });
 
-    // Import Data
     btnImport?.addEventListener('click', () => {
       importFileInput?.click();
     });
@@ -1302,7 +1488,6 @@ export class UIController {
       importFileInput.value = '';
     });
 
-    // Factory Reset Data
     btnResetAll?.addEventListener('click', () => {
       this.showConfirmDialog(
         t('resetData'),

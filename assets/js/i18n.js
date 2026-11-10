@@ -15,28 +15,38 @@ export const translations = {
     noBoardsYet: 'No boards yet',
     noBoardsSub: 'Tap the button below to create your first board.',
     noPinnedBoards: 'No pinned boards',
-    noTasksInSection: 'No tasks here. Tap + to add one.',
+    addYourTask: 'Add your task',
     newBoard: 'New Board',
-    boardTitlePlaceholder: 'Board name...',
+    boardNameLabel: 'Board name',
+    boardTitlePlaceholder: 'e.g. Goals for this year',
     create: 'Create',
     cancel: 'Cancel',
     save: 'Save',
     back: 'Back',
     delete: 'Delete',
+    deleteSelected: 'Delete Selected',
+    selectedCount: (n) => `${n} Selected`,
     undo: 'Undo',
     redo: 'Redo',
     pin: 'Pin Board',
     unpin: 'Unpin Board',
     deleteBoard: 'Delete Board',
     confirmDeleteBoard: 'Are you sure you want to delete this board? This cannot be undone.',
+    confirmDeleteSelected: (n) => `Are you sure you want to delete ${n} selected board(s)?`,
     selectBoards: 'Select Boards',
+    doneSelection: 'Done',
     sortBy: 'Sort By',
-    sortDefaultSubtitle: 'Default (Date Edited)',
+    sortDefault: 'Default (Date Edited)',
+    sortDateEdited: 'Date Edited',
+    sortDateCreated: 'Date Created',
+    sortTitle: 'Title',
+    sortNewestFirst: 'Newest First',
+    sortOldestFirst: 'Oldest First',
     darkMode: 'Dark Mode',
-    sectionTitlePlaceholder: 'Section name (e.g. Wednesday:, Weekend:)...',
+    sectionTitlePlaceholder: 'Section name (e.g Wednesday)',
     addSection: 'Add Day / Section',
     newSectionPrompt: 'New Section / Day',
-    addTaskPlaceholder: 'Add a new task...',
+    addTaskPlaceholder: '', // Removed placeholder as requested
     addTask: 'Add Task',
     crossOutTask: 'Cross Out',
     uncrossTask: 'Restore Text',
@@ -45,18 +55,9 @@ export const translations = {
     // Settings Modal
     settings: 'Settings',
     generalSettings: 'General Settings',
-    sorting: 'Sort Boards By',
-    sortDefault: 'Default (Date Edited)',
-    sortCreated: 'Date Created',
-    sortTitle: 'Alphabetical (A - Z)',
     themeLight: 'Light',
     themeDark: 'Dark',
     themeSystem: 'System Auto',
-    fontSize: 'Font Size in Board',
-    fontSizeSmall: 'Small',
-    fontSizeMedium: 'Medium',
-    fontSizeLarge: 'Large',
-    fontSizeXLarge: 'Extra Large',
     language: 'Language',
     langEn: 'English',
     langDe: 'Deutsch',
@@ -96,28 +97,38 @@ export const translations = {
     noBoardsYet: 'Noch keine Boards vorhanden',
     noBoardsSub: 'Tippe auf den Button unten, um dein erstes Board zu erstellen.',
     noPinnedBoards: 'Keine angehefteten Boards',
-    noTasksInSection: 'Keine Aufgaben. Tippe +, um eine hinzuzufügen.',
+    addYourTask: 'Add your task',
     newBoard: 'Neues Board',
-    boardTitlePlaceholder: 'Name des Boards...',
+    boardNameLabel: 'Board name',
+    boardTitlePlaceholder: 'e.g. Goals for this year',
     create: 'Erstellen',
     cancel: 'Abbrechen',
     save: 'Speichern',
     back: 'Zurück',
     delete: 'Löschen',
+    deleteSelected: 'Ausgewählte löschen',
+    selectedCount: (n) => `${n} ausgewählt`,
     undo: 'Rückgängig',
     redo: 'Wiederholen',
     pin: 'Board anheften',
     unpin: 'Board lösen',
     deleteBoard: 'Board löschen',
     confirmDeleteBoard: 'Möchtest du dieses Board wirklich löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.',
+    confirmDeleteSelected: (n) => `Möchtest du ${n} ausgewählte(s) Board(s) wirklich löschen?`,
     selectBoards: 'Boards auswählen',
+    doneSelection: 'Fertig',
     sortBy: 'Sortieren',
-    sortDefaultSubtitle: 'Standard (Zuletzt bearbeitet)',
+    sortDefault: 'Default (Date Edited)',
+    sortDateEdited: 'Date Edited',
+    sortDateCreated: 'Date Created',
+    sortTitle: 'Title',
+    sortNewestFirst: 'Newest First',
+    sortOldestFirst: 'Oldest First',
     darkMode: 'Dunkelmodus',
-    sectionTitlePlaceholder: 'Abschnittsname (z.B. Mittwoch:, Wochenende:)...',
+    sectionTitlePlaceholder: 'Section name (e.g Wednesday)',
     addSection: 'Tag / Abschnitt hinzufügen',
     newSectionPrompt: 'Neuer Tag / Abschnitt',
-    addTaskPlaceholder: 'Neue Aufgabe hinzufügen...',
+    addTaskPlaceholder: '', // Removed placeholder
     addTask: 'Aufgabe hinzufügen',
     crossOutTask: 'Durchstreichen',
     uncrossTask: 'Wiederherstellen',
@@ -126,18 +137,9 @@ export const translations = {
     // Settings Modal
     settings: 'Einstellungen',
     generalSettings: 'Allgemeine Einstellungen',
-    sorting: 'Boards sortieren nach',
-    sortDefault: 'Standard (Zuletzt bearbeitet)',
-    sortCreated: 'Erstellungsdatum',
-    sortTitle: 'Alphabetisch (A - Z)',
     themeLight: 'Hell',
     themeDark: 'Dunkel',
     themeSystem: 'Systemeinstellung',
-    fontSize: 'Schriftgröße im Board',
-    fontSizeSmall: 'Klein',
-    fontSizeMedium: 'Mittel',
-    fontSizeLarge: 'Groß',
-    fontSizeXLarge: 'Sehr groß',
     language: 'Sprache',
     langEn: 'English',
     langDe: 'Deutsch',
@@ -159,8 +161,8 @@ export const translations = {
     resetSuccess: 'Alle Daten wurden erfolgreich gelöscht.',
     
     // Timestamps
-    createdOn: (dateStr) => `Erstellt am ${dateStr}`,
-    editedOn: (dateStr, timeStr) => `Bearbeitet am ${dateStr} um ${timeStr}`,
+    createdOn: (dateStr) => `Created ${dateStr}`,
+    editedOn: (dateStr, timeStr) => `Edited ${dateStr} at ${timeStr}`,
     yesterday: 'Gestern',
     today: 'Heute',
 
@@ -214,13 +216,6 @@ export function formatTime(timestamp) {
   return `${hours}:${minutes}`;
 }
 
-/**
- * Exact board timestamp logic requested:
- * - If edited today: ONLY the time (e.g. 19:11)
- * - If edited yesterday: ONLY Yesterday (or Gestern)
- * - If earlier: Date format (e.g. 28.10.2026)
- * - The word "edited" is NEVER shown anywhere!
- */
 export function formatBoardTimestamp(timestamp) {
   if (!timestamp) return '';
   const now = new Date();
@@ -238,7 +233,6 @@ export function formatBoardTimestamp(timestamp) {
     return t('yesterday');
   }
 
-  // Format as DD.MM.YYYY (e.g. 28.10.2026)
   const d = String(date.getDate()).padStart(2, '0');
   const m = String(date.getMonth() + 1).padStart(2, '0');
   const y = date.getFullYear();

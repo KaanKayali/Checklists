@@ -41,7 +41,7 @@
             </div>
           </div>
           <div class="header-actions">
-            <!-- 3-Dots Button: White Circle with Horizontal Dots -->
+            <!-- Normal 3-Dots Button: White Circle with Horizontal Dots -->
             <button class="btn-circle" id="btnMainMenu" aria-label="Main Menu" title="Menu">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <circle cx="6" cy="12" r="2"/>
@@ -49,47 +49,112 @@
                 <circle cx="18" cy="12" r="2"/>
               </svg>
             </button>
+
+            <!-- Selection Mode Action Bar (appears when selecting boards) -->
+            <div class="selection-action-bar" id="selectionActionBar" style="display: none;">
+              <button class="btn btn-danger" id="btnDeleteSelected" style="padding: 6px 12px; font-size: 0.85rem;" disabled>
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                <span id="deleteSelectedText">Delete (0)</span>
+              </button>
+              <button class="btn btn-secondary" id="btnCancelSelection" style="padding: 6px 12px; font-size: 0.85rem;">
+                <span data-i18n="doneSelection">Done</span>
+              </button>
+            </div>
           </div>
         </header>
 
-        <!-- Main Menu Dropdown (Select Boards, Sort By, Dark Mode, Settings) -->
+        <!-- Main Menu Dropdown (With Hierarchical Sort By Sub-view) -->
         <div class="menu-dropdown" id="mainMenuDropdown">
-          <!-- Select Boards -->
-          <button class="menu-item" id="menuItemSelectBoards">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-              <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
-            </svg>
-            <span data-i18n="selectBoards">Select Boards</span>
-          </button>
+          <!-- Main Menu Root View -->
+          <div id="mainMenuRoot">
+            <!-- Select Boards -->
+            <button class="menu-item" id="menuItemSelectBoards">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-9 14l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+              <span data-i18n="selectBoards">Select Boards</span>
+            </button>
 
-          <!-- Sort By with subtitle 'Default (Date Edited)' -->
-          <button class="menu-item" id="menuItemSortBy">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-              <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/>
-            </svg>
-            <div class="menu-item-content">
-              <span data-i18n="sortBy">Sort By</span>
-              <span class="menu-item-subtitle" id="menuSortSubtitle">Default (Date Edited)</span>
+            <!-- Sort By with Subtitle & Arrow to open sub-view -->
+            <button class="menu-item" id="menuItemSortBy">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/>
+              </svg>
+              <div class="menu-item-content">
+                <span data-i18n="sortBy">Sort By</span>
+                <span class="menu-item-subtitle" id="menuSortSubtitle">Default (Date Edited)</span>
+              </div>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="opacity: 0.6;">
+                <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+              </svg>
+            </button>
+
+            <!-- Dark Mode Toggle -->
+            <button class="menu-item" id="menuItemDarkMode">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" id="darkModeIcon">
+                <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
+              </svg>
+              <span data-i18n="darkMode">Dark Mode</span>
+            </button>
+
+            <div class="menu-divider"></div>
+
+            <!-- Settings Modal Opener -->
+            <button class="menu-item" id="menuItemSettings">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+              </svg>
+              <span data-i18n="settings">Settings</span>
+            </button>
+          </div>
+
+          <!-- Sort By Sub-View (Matches provided image exactly) -->
+          <div class="sort-submenu" id="sortSubmenu" style="display: none;">
+            <div class="sort-submenu-header" id="btnBackToSortMenu">
+              <div class="sort-submenu-header-left">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                  <path d="M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z"/>
+                </svg>
+                <div class="sort-submenu-header-titles">
+                  <span class="sort-submenu-title" data-i18n="sortBy">Sort By</span>
+                  <span class="sort-submenu-subtitle" id="sortSubmenuSubtitle">Default (Date Edited)</span>
+                </div>
+              </div>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
+              </svg>
             </div>
-          </button>
 
-          <!-- Dark Mode Toggle -->
-          <button class="menu-item" id="menuItemDarkMode">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" id="darkModeIcon">
-              <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9c0-.46-.04-.92-.1-1.36-.98 1.37-2.58 2.26-4.4 2.26-2.98 0-5.4-2.42-5.4-5.4 0-1.81.89-3.42 2.26-4.4-.44-.06-.9-.1-1.36-.1z"/>
-            </svg>
-            <span data-i18n="darkMode">Dark Mode</span>
-          </button>
+            <!-- Sort By Criteria Options -->
+            <button class="sort-option-item" data-sort="default">
+              <span class="sort-option-check">✓</span>
+              <span data-i18n="sortDefault">Default (Date Edited)</span>
+            </button>
+            <button class="sort-option-item" data-sort="updatedAt">
+              <span class="sort-option-check">✓</span>
+              <span data-i18n="sortDateEdited">Date Edited</span>
+            </button>
+            <button class="sort-option-item" data-sort="createdAt">
+              <span class="sort-option-check">✓</span>
+              <span data-i18n="sortDateCreated">Date Created</span>
+            </button>
+            <button class="sort-option-item" data-sort="title">
+              <span class="sort-option-check">✓</span>
+              <span data-i18n="sortTitle">Title</span>
+            </button>
 
-          <div class="menu-divider"></div>
+            <div class="menu-divider"></div>
 
-          <!-- Settings Modal Opener -->
-          <button class="menu-item" id="menuItemSettings">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-              <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
-            </svg>
-            <span data-i18n="settings">Settings</span>
-          </button>
+            <!-- Sort Direction Options -->
+            <button class="sort-option-item" data-order="desc">
+              <span class="sort-option-check">✓</span>
+              <span data-i18n="sortNewestFirst">Newest First</span>
+            </button>
+            <button class="sort-option-item" data-order="asc">
+              <span class="sort-option-check">✓</span>
+              <span data-i18n="sortOldestFirst">Oldest First</span>
+            </button>
+          </div>
         </div>
 
         <!-- Master Content List -->
@@ -118,18 +183,17 @@
             </div>
             <div class="boards-card-container" id="allContainer"></div>
           </div>
+        </div>
 
-          <!-- Footer: @KaanKayali in gray -->
-          <footer class="app-footer">
-            @KaanKayali
-          </footer>
+        <!-- Bottom Fade from white/bg to transparent + Sticky Footer @KaanKayali -->
+        <div class="master-bottom-overlay">
+          <span class="app-footer-sticky">@KaanKayali</span>
         </div>
 
         <!-- Floating Action Button (FAB): White Circle with Black Sheet/Pencil Icon -->
-        <div class="fab-container">
+        <div class="fab-container" id="fabContainer">
           <button class="fab-white" id="btnFab" aria-label="New Board" title="New Board">
             <svg viewBox="0 0 24 24">
-              <!-- Sheet / surface with pencil over it -->
               <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
             </svg>
           </button>
@@ -150,8 +214,12 @@
               </svg>
             </button>
             <div class="detail-title-container">
-              <input type="text" class="detail-title-input" id="detailTitleInput" placeholder="Board Name...">
-              <div class="detail-meta" id="detailTimestamps">Created ... | Edited ...</div>
+              <input type="text" class="detail-title-input" id="detailTitleInput" placeholder="Board Name">
+              <!-- Stacked Created and Edited Timestamps (untereinander) -->
+              <div class="detail-meta-stacked" id="detailTimestamps">
+                <span id="metaCreated">Created ...</span>
+                <span id="metaEdited">Edited ...</span>
+              </div>
             </div>
           </div>
 
@@ -198,7 +266,7 @@
         </div>
 
         <!-- Detail Bottom Action Toolbar: iPhone Wireframe Layout -->
-        <footer class="detail-toolbar">
+        <footer class="detail-toolbar" id="detailToolbar">
           <!-- Left rounded capsule with Add Day, Cross Out, and Clear Text (backspace icon) -->
           <div class="toolbar-left-group">
             <!-- Add Day / Section -->
@@ -247,8 +315,9 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label class="form-label" data-i18n="boardTitlePlaceholder">Board name...</label>
-          <input type="text" class="form-input" id="newBoardTitleInput" data-i18n-placeholder="boardTitlePlaceholder" placeholder="Board name...">
+          <!-- Textfield label is 'Board name' and placeholder is 'e.g. Goals for this year' -->
+          <label class="form-label" data-i18n="boardNameLabel">Board name</label>
+          <input type="text" class="form-input" id="newBoardTitleInput" data-i18n-placeholder="boardTitlePlaceholder" placeholder="e.g. Goals for this year">
         </div>
       </div>
       <div class="modal-footer">
@@ -266,8 +335,8 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label class="form-label" data-i18n="sectionTitlePlaceholder">Section name...</label>
-          <input type="text" class="form-input" id="newSectionTitleInput" data-i18n-placeholder="sectionTitlePlaceholder" placeholder="Section name (e.g. Wednesday:, Weekend:)...">
+          <label class="form-label">Section name</label>
+          <input type="text" class="form-input" id="newSectionTitleInput" data-i18n-placeholder="sectionTitlePlaceholder" placeholder="Section name (e.g Wednesday)">
         </div>
       </div>
       <div class="modal-footer">
@@ -284,17 +353,6 @@
         <h3 class="modal-title" data-i18n="settings">Settings</h3>
       </div>
       <div class="modal-body">
-        <!-- Font Size in Board -->
-        <div class="form-group">
-          <label class="form-label" data-i18n="fontSize">Font Size in Board</label>
-          <select class="form-select" id="settingFontSize">
-            <option value="small" data-i18n="fontSizeSmall">Small</option>
-            <option value="medium" data-i18n="fontSizeMedium">Medium</option>
-            <option value="large" data-i18n="fontSizeLarge">Large</option>
-            <option value="xlarge" data-i18n="fontSizeXLarge">Extra Large</option>
-          </select>
-        </div>
-
         <!-- Language -->
         <div class="form-group">
           <label class="form-label" data-i18n="language">Language</label>

@@ -20,8 +20,8 @@ export function getDefaultState() {
     settings: {
       language: browserLang,
       theme: 'light', // 'light' | 'dark' | 'system'
-      fontSize: 'medium', // 'small' | 'medium' | 'large' | 'xlarge'
-      sortBy: 'updatedAt_desc', // 'updatedAt_desc' | 'createdAt_desc' | 'title_asc' | 'manual'
+      sortBy: 'updatedAt', // 'default' | 'updatedAt' | 'createdAt' | 'title'
+      sortOrder: 'desc', // 'desc' (Newest First) | 'asc' (Oldest First)
       pinnedCollapsed: false
     },
     activeBoardId: null,
@@ -57,6 +57,22 @@ export function loadData() {
       parsed.settings = getDefaultState().settings;
     }
 
+    // Support legacy sort field
+    if (parsed.settings.sortBy === 'updatedAt_desc') {
+      parsed.settings.sortBy = 'default';
+      parsed.settings.sortOrder = 'desc';
+    } else if (parsed.settings.sortBy === 'createdAt_desc') {
+      parsed.settings.sortBy = 'createdAt';
+      parsed.settings.sortOrder = 'desc';
+    } else if (parsed.settings.sortBy === 'title_asc') {
+      parsed.settings.sortBy = 'title';
+      parsed.settings.sortOrder = 'asc';
+    }
+
+    if (!parsed.settings.sortOrder) {
+      parsed.settings.sortOrder = 'desc';
+    }
+
     // Support legacy activeChecklistId
     if (parsed.activeChecklistId && !parsed.activeBoardId) {
       parsed.activeBoardId = parsed.activeChecklistId;
@@ -71,7 +87,6 @@ export function loadData() {
 
 export function saveData(data) {
   try {
-    // Keep legacy field synced for export compatibility if needed
     data.checklists = data.boards;
     data.activeChecklistId = data.activeBoardId;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -110,7 +125,6 @@ export function parseImportJSON(jsonText) {
     const parsed = JSON.parse(jsonText);
     const payload = parsed.data || parsed;
 
-    // Support either boards or checklists array
     const boards = payload.boards || payload.checklists;
     if (!boards || !Array.isArray(boards)) {
       throw new Error('Missing boards array in JSON');
@@ -143,7 +157,6 @@ export function mergeImportData(existingState, importedPayload, replaceMode = fa
     };
   }
 
-  // Merge mode
   const boardMap = new Map();
   for (const b of existingState.boards) {
     boardMap.set(b.id, b);
