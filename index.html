@@ -42,7 +42,7 @@
           </div>
           <div class="header-actions">
             <!-- Normal 3-Dots Button: White Circle with Horizontal Dots -->
-            <button class="btn-circle" id="btnMainMenu" aria-label="Main Menu" title="Menu">
+            <button class="btn-circle" id="btnMainMenu" data-i18n-aria-label="menuLabel" data-i18n-title="menuLabel" aria-label="Open menu" title="Open menu">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <circle cx="6" cy="12" r="2"/>
                 <circle cx="12" cy="12" r="2"/>
@@ -166,7 +166,7 @@
           <div class="pinned-group" id="pinnedSectionContainer" style="display: none;">
             <div class="section-header-row">
               <span class="section-title-heading" data-i18n="pinnedBoards">Pinned</span>
-              <button class="btn-toggle-pinned" id="btnTogglePinned" aria-label="Toggle Pinned Boards" title="Toggle">
+              <button class="btn-toggle-pinned" id="btnTogglePinned" data-i18n-aria-label="pinnedToggleLabel" data-i18n-title="pinnedToggleLabel" aria-label="Show or hide pinned boards" title="Show or hide pinned boards">
                 <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                   <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z"/>
                 </svg>
@@ -192,7 +192,7 @@
 
         <!-- Floating Action Button (FAB): White Circle with Black Sheet/Pencil Icon -->
         <div class="fab-container" id="fabContainer">
-          <button class="fab-white" id="btnFab" aria-label="New Board" title="New Board">
+          <button class="fab-white" id="btnFab" data-i18n-aria-label="newBoardLabel" data-i18n-title="newBoardLabel" aria-label="New board" title="New board">
             <svg viewBox="0 0 24 24">
               <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
             </svg>
@@ -208,13 +208,13 @@
         <header class="detail-header">
           <div class="detail-header-left">
             <!-- Back Button: White Circle -->
-            <button class="btn-circle btn-back" id="btnBack" aria-label="Back" title="Back">
+            <button class="btn-circle btn-back" id="btnBack" data-i18n-aria-label="backLabel" data-i18n-title="backLabel" aria-label="Back" title="Back">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
               </svg>
             </button>
             <div class="detail-title-container">
-              <input type="text" class="detail-title-input" id="detailTitleInput" placeholder="Board Name">
+              <input type="text" class="detail-title-input" id="detailTitleInput" data-i18n-placeholder="boardNameLabel" placeholder="Board name">
               <!-- Stacked Created and Edited Timestamps (untereinander) -->
               <div class="detail-meta-stacked" id="detailTimestamps">
                 <span id="metaCreated">Created ...</span>
@@ -226,14 +226,14 @@
           <!-- Detail Header Actions: Undo and 3-Dots in White Circles -->
           <div class="header-actions">
             <!-- Undo Button (Curved arrow): White Circle -->
-            <button class="btn-circle" id="btnUndo" disabled title="Undo (Ctrl+Z)" aria-label="Undo">
+            <button class="btn-circle" id="btnUndo" disabled data-i18n-title="undoLabel" data-i18n-aria-label="undoLabel" title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
               </svg>
             </button>
 
             <!-- 3-Dots Button: White Circle with Horizontal Dots -->
-            <button class="btn-circle" id="btnDetailMenu" aria-label="Board Menu" title="Board Actions">
+            <button class="btn-circle" id="btnDetailMenu" data-i18n-title="boardMenuLabel" data-i18n-aria-label="boardMenuLabel" aria-label="Board menu" title="Board menu">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <circle cx="6" cy="12" r="2"/>
                 <circle cx="12" cy="12" r="2"/>
@@ -270,21 +270,21 @@
           <!-- Left rounded capsule with Add Day, Cross Out, and Clear Text (backspace icon) -->
           <div class="toolbar-left-group">
             <!-- Add Day / Section -->
-            <button class="toolbar-action-btn" id="btnAddSection" title="Add Day / Section" aria-label="Add Section">
+            <button class="toolbar-action-btn" id="btnAddSection" data-i18n-title="addSectionLabel" data-i18n-aria-label="addSectionLabel" title="Add section" aria-label="Add section">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
                 <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zm-7 5h5v5h-5z"/>
               </svg>
             </button>
 
             <!-- Cross Out / Strike line at cursor -->
-            <button class="toolbar-action-btn" id="btnCrossOut" title="Cross Out" aria-label="Cross Out">
+            <button class="toolbar-action-btn" id="btnCrossOut" data-i18n-title="crossOutLabel" data-i18n-aria-label="crossOutLabel" title="Cross out task" aria-label="Cross out task">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
                 <path d="M10 19h4v-3h-4v3zM5 4v3h5v3h4V7h5V4H5zM3 14h18v-2H3v2z"/>
               </svg>
             </button>
 
             <!-- Clear Text with Backspace (Zurücktaste) Icon -->
-            <button class="toolbar-action-btn" id="btnClearText" title="Clear Text" aria-label="Clear Text">
+            <button class="toolbar-action-btn" id="btnClearText" data-i18n-title="clearTextLabel" data-i18n-aria-label="clearTextLabel" title="Clear task text" aria-label="Clear task text">
               <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
                 <path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"/>
               </svg>
@@ -292,7 +292,7 @@
           </div>
 
           <!-- Right standalone circle button for Add Task -->
-          <button class="toolbar-right-add" id="btnAddTask" title="Add Task" aria-label="Add Task">
+          <button class="toolbar-right-add" id="btnAddTask" data-i18n-title="addTaskLabel" data-i18n-aria-label="addTaskLabel" title="Add task" aria-label="Add task">
             <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
             </svg>
@@ -335,7 +335,7 @@
       </div>
       <div class="modal-body">
         <div class="form-group">
-          <label class="form-label">Section name</label>
+          <label class="form-label" data-i18n="sectionNameLabel">Section name</label>
           <input type="text" class="form-input" id="newSectionTitleInput" data-i18n-placeholder="sectionTitlePlaceholder" placeholder="Section name (e.g Wednesday)">
         </div>
       </div>
@@ -388,7 +388,7 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary" id="btnCloseSettings" data-i18n="save">Close</button>
+        <button class="btn btn-primary" id="btnCloseSettings" data-i18n="close">Close</button>
       </div>
     </div>
   </div>

@@ -229,7 +229,7 @@ export class UIController {
     const current = this.state.settings.theme || 'light';
     const next = current === 'dark' ? 'light' : 'dark';
     this.applyTheme(next);
-    this.showToast(`${t('darkMode')}: ${next === 'dark' ? t('themeDark') : t('themeLight')}`);
+    this.showToast(next === 'dark' ? t('darkModeOn') : t('darkModeOff'));
   }
 
   // --- Sorting & Submenu Handling ---
@@ -364,7 +364,7 @@ export class UIController {
         }
         this.save();
         this.endSelectionMode();
-        this.showToast(t('deleteSelected'));
+        this.showToast(t('boardsDeleted'));
       }
     );
   }
@@ -600,7 +600,7 @@ export class UIController {
                      placeholder="${t('sectionTitlePlaceholder')}"
                      data-section-id="${section.id}">
               ${board.sections.length > 1 ? `
-                <button class="btn-section-delete" data-section-id="${section.id}" title="${t('delete')}">
+                <button class="btn-section-delete" data-section-id="${section.id}" title="${t('delete')}" aria-label="${t('delete')}">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
                   </svg>
@@ -637,7 +637,7 @@ export class UIController {
         </div>
 
         <div class="task-content-wrapper">
-          <div class="custom-checkbox" data-task-id="${task.id}" data-section-id="${sectionId}" title="Toggle">
+          <div class="custom-checkbox" data-task-id="${task.id}" data-section-id="${sectionId}" title="${t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel')}" aria-label="${t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel')}" role="checkbox" aria-checked="${isCompleted}" tabindex="0">
             <svg viewBox="0 0 24 24">
               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
             </svg>
@@ -650,7 +650,7 @@ export class UIController {
                     data-section-id="${sectionId}">${this.escapeHTML(task.text || '')}</textarea>
 
           <!-- Desktop Delete Button (visible only on large screens on hover) -->
-          <button class="btn-task-delete-desktop" data-task-id="${task.id}" data-section-id="${sectionId}" title="${t('delete')}">
+          <button class="btn-task-delete-desktop" data-task-id="${task.id}" data-section-id="${sectionId}" title="${t('delete')}" aria-label="${t('delete')}">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
             </svg>
@@ -669,6 +669,13 @@ export class UIController {
     checkboxes.forEach(cb => {
       cb.addEventListener('click', (e) => {
         e.stopPropagation();
+        const taskId = cb.getAttribute('data-task-id');
+        const sectionId = cb.getAttribute('data-section-id');
+        this.toggleTaskCompleted(sectionId, taskId);
+      });
+      cb.addEventListener('keydown', (e) => {
+        if (e.key !== ' ' && e.key !== 'Enter') return;
+        e.preventDefault();
         const taskId = cb.getAttribute('data-task-id');
         const sectionId = cb.getAttribute('data-section-id');
         this.toggleTaskCompleted(sectionId, taskId);
@@ -1058,7 +1065,7 @@ export class UIController {
           contentWrapper.style.transform = 'translateX(-100%)';
           setTimeout(() => {
             this.deleteTask(sectionId, taskId);
-            this.showToast(t('delete'));
+            this.showToast(t('taskDeleted'));
           }, 200);
         } else {
           contentWrapper.style.transform = 'translateX(0)';
@@ -1082,7 +1089,7 @@ export class UIController {
     this.save();
     this.renderOverview();
     this.renderDetail();
-    this.showToast(board.pinned ? t('pin') : t('unpin'));
+    this.showToast(board.pinned ? t('boardPinned') : t('boardUnpinned'));
   }
 
   confirmDeleteActiveBoard() {
@@ -1103,7 +1110,7 @@ export class UIController {
         } else {
           this.renderDetail();
         }
-        this.showToast(t('deleteBoard'));
+        this.showToast(t('boardDeleted'));
       }
     );
   }
@@ -1168,6 +1175,11 @@ export class UIController {
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
       const key = el.getAttribute('data-i18n-title');
       el.title = t(key);
+    });
+
+    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+      const key = el.getAttribute('data-i18n-aria-label');
+      el.setAttribute('aria-label', t(key));
     });
 
     if (this.brandTitleEl) {
@@ -1343,7 +1355,7 @@ export class UIController {
       this.save();
       this.closeModal(this.newBoardModal);
       this.openBoard(newBoard.id);
-      this.showToast(t('newBoard'));
+      this.showToast(t('boardCreated'));
     });
 
     document.getElementById('btnCreateBoardCancel')?.addEventListener('click', () => {
@@ -1457,7 +1469,7 @@ export class UIController {
 
     btnExport?.addEventListener('click', () => {
       exportDataToFile(this.state);
-      this.showToast(t('exportData'));
+      this.showToast(t('exportSuccess'));
     });
 
     btnImport?.addEventListener('click', () => {
@@ -1477,7 +1489,7 @@ export class UIController {
           return;
         }
 
-        const shouldReplace = window.confirm(`${t('importReplaceOrMerge')}\n\n[OK] = ${t('importMerge')}\n[Cancel] = ${t('importReplace')}`);
+        const shouldReplace = window.confirm(`${t('importReplaceOrMerge')}\n\nOK: ${t('importMerge')}\nCancel: ${t('importReplace')}`);
         this.state = mergeImportData(this.state, parsed, !shouldReplace);
         this.save();
         this.init();
