@@ -26,6 +26,9 @@ A lightning-fast, offline-capable Checklists web application built for iPhone (P
 - **Circular Checkmark Badge:** High-finish circular badge in `#f5b914` with a crisp white checkmark (`✓`) when completed.
 - **Day / Section Grouping:** Organize tasks into days or custom sections (e.g. `Montag:`, `Mittwoch:`, `Wochenende:`).
 - **Task Editing:** Edit task text directly on desktop. On mobile, tap a task to select it, then use the **T** button to edit; tapping task text alone won’t place a cursor.
+- **Reordering:** Drag tasks and use the section grip to reorder sections; a highlighted insertion line shows where items will land. On touchscreens, press and hold a task or grip to drag.
+- **Add Task:** With no task or section selected, the **+** button adds a task at the bottom of the board.
+- **Mobile Toolbar:** The bottom toolbar stays in place when the keyboard opens.
 - **Empty Tasks:** Blank tasks are removed when you leave them and cleaned up when the app opens.
 - **Mobile Task Deletion:** Swipe a task left to reveal its delete button; it is removed only when you tap the trash icon.
 - **Undo Engine:** A dedicated top-toolbar curved arrow button (and `Ctrl+Z` / `Cmd+Z`) lets you revert checklist edits, toggles, and deletions in real time.

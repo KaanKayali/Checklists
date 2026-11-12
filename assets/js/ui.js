@@ -108,27 +108,6 @@ export class UIController {
     this.restoreScrollPositions();
     this.updateStaticTranslations();
     this.updateSortUI();
-    this.bindVisualViewport();
-  }
-
-  // --- Dynamic Keyboard Adaptation on Mobile ---
-  bindVisualViewport() {
-    if (window.visualViewport) {
-      const onViewportChange = () => {
-        if (!this.detailToolbar) return;
-        const currentViewport = window.visualViewport;
-        const offsetBottom = Math.max(0, window.innerHeight - (currentViewport.height + currentViewport.offsetTop));
-        if (offsetBottom > 50) {
-          // Keyboard is open! Stick toolbar directly above keyboard
-          this.detailToolbar.style.bottom = `${offsetBottom}px`;
-        } else {
-          // Keyboard is closed
-          this.detailToolbar.style.bottom = '0px';
-        }
-      };
-      window.visualViewport.addEventListener('resize', onViewportChange);
-      window.visualViewport.addEventListener('scroll', onViewportChange);
-    }
   }
 
   // --- State Persistence & Undo ---
@@ -222,9 +201,14 @@ export class UIController {
     const themeBg = effective === 'dark' ? '#1a202c' : '#f8f9fb';
     document.documentElement.style.backgroundColor = themeBg;
     document.body.style.backgroundColor = themeBg;
+    document.documentElement.style.colorScheme = effective;
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
       metaTheme.setAttribute('content', themeBg);
+    }
+    const statusBarStyle = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (statusBarStyle) {
+      statusBarStyle.setAttribute('content', effective === 'dark' ? 'black-translucent' : 'default');
     }
     this.save();
   }
@@ -376,6 +360,7 @@ export class UIController {
   // --- View Switching ---
   openBoard(id, pushHistory = true) {
     this.saveScrollPosition();
+    if (this.detailContent) this.detailContent.style.paddingBottom = '';
     this.clearTaskSelection();
     this.state.activeBoardId = id;
     this.activeTaskId = null;
@@ -472,7 +457,7 @@ export class UIController {
               <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
                 <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
               </svg>
-            </button>
+            </div>
             <div class="empty-state-title">${t('noBoardsYet')}</div>
             <div class="empty-state-sub">${t('noBoardsSub')}</div>
           </div>
@@ -542,6 +527,7 @@ export class UIController {
   renderDetail() {
     const board = this.getActiveBoard();
     if (!board) {
+      if (this.detailContent) this.detailContent.style.paddingBottom = '';
       this.clearTaskSelection();
       if (this.detailTitleInput) this.detailTitleInput.value = '';
       if (this.metaCreated) this.metaCreated.textContent = '';
@@ -600,6 +586,11 @@ export class UIController {
         this.sectionsContainer.innerHTML = board.sections.map((section) => `
           <div class="task-section" data-section-id="${section.id}">
             <div class="task-section-header">
+              <button type="button" class="section-drag-handle" data-section-id="${section.id}" aria-label="${t('moveSectionLabel')}" title="${t('moveSectionLabel')}">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
+                  <path d="M9 5a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm10-14a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm0 7a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/>
+                </svg>
+              </button>
               <input type="text" 
                      class="section-title-input" 
                      value="${this.escapeHTML(section.title || '')}" 
@@ -960,14 +951,21 @@ export class UIController {
     if (window.innerWidth < 860) this.editingTaskId = newTask.id;
     this.save();
     this.renderDetail();
+    this.focusAndCenterTask(newTask.id);
+  }
 
-    setTimeout(() => {
-      const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${newTask.id}"]`);
-      if (input) {
-        input.focus();
-        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 50);
+  focusAndCenterTask(taskId) {
+    const input = this.sectionsContainer?.querySelector(`.task-input[data-task-id="${taskId}"]`);
+    const content = this.detailContent;
+    if (!input || !content) return;
+
+    input.focus();
+    requestAnimationFrame(() => {
+      if (!input.isConnected) return;
+      const currentPadding = Number.parseFloat(getComputedStyle(content).paddingBottom) || 0;
+      content.style.paddingBottom = `${Math.max(currentPadding, content.clientHeight / 2)}px`;
+      input.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    });
   }
 
   addTaskAtCursorOrBottom() {
@@ -984,13 +982,12 @@ export class UIController {
       }];
     }
 
-    let targetSection = board.sections[0];
-    if (this.activeSectionId) {
-      const found = board.sections.find(s => s.id === this.activeSectionId);
-      if (found) targetSection = found;
-    }
-    const focusedSectionTitle = document.activeElement?.closest('.task-section')?.dataset.sectionId;
-    if (focusedSectionTitle) targetSection = board.sections.find(s => s.id === focusedSectionTitle) || targetSection;
+    const focusedSectionId = document.activeElement?.closest('.task-section')?.dataset.sectionId;
+    const selectedSectionId = this.sectionsContainer?.querySelector('.task-section.section-selected')?.dataset.sectionId;
+    const targetSectionId = this.selectedTaskId
+      ? this.selectedTaskSectionId
+      : (selectedSectionId || this.activeSectionId || focusedSectionId);
+    const targetSection = board.sections.find(section => section.id === targetSectionId) || board.sections[board.sections.length - 1];
     if (!targetSection.tasks) targetSection.tasks = [];
 
     const newTask = {
@@ -1000,8 +997,8 @@ export class UIController {
       crossedOut: false
     };
 
-    if (this.activeTaskId) {
-      const curIndex = targetSection.tasks.findIndex(t => t.id === this.activeTaskId);
+    if (this.selectedTaskId) {
+      const curIndex = targetSection.tasks.findIndex(task => task.id === this.selectedTaskId);
       if (curIndex !== -1) {
         targetSection.tasks.splice(curIndex + 1, 0, newTask);
       } else {
@@ -1020,14 +1017,7 @@ export class UIController {
     this.save();
     this.renderDetail();
 
-    // Immediately focus input so keyboard opens up!
-    setTimeout(() => {
-      const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${newTask.id}"]`);
-      if (input) {
-        input.focus();
-        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 50);
+    this.focusAndCenterTask(newTask.id);
   }
 
   deleteTask(sectionId, taskId, pushHistory = true) {
@@ -1092,14 +1082,7 @@ export class UIController {
     if (window.innerWidth < 860) this.editingTaskId = newSec.tasks[0].id;
     this.save();
     this.renderDetail();
-
-    setTimeout(() => {
-      const input = this.sectionsContainer.querySelector(`.task-input[data-section-id="${newSec.id}"]`);
-      if (input) {
-        input.focus();
-        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
-    }, 50);
+    this.focusAndCenterTask(newSec.tasks[0].id);
   }
 
   deleteSection(sectionId) {
@@ -1117,168 +1100,372 @@ export class UIController {
 
   // --- Mobile Touch Gestures: Swipe-to-Delete ---
   bindSwipeGestures() {
-    const taskItems = this.sectionsContainer.querySelectorAll('.task-item');
-    
-    taskItems.forEach(item => {
-      const contentWrapper = item.querySelector('.task-content-wrapper');
-      const swipeAction = item.querySelector('.task-swipe-action');
-      const taskId = item.getAttribute('data-task-id');
-      const sectionId = item.getAttribute('data-section-id');
+    const clearHoldTimer = state => {
+      if (state.holdTimer) clearTimeout(state.holdTimer);
+      state.holdTimer = null;
+    };
 
-      let startX = 0;
-      let startY = 0;
-      let isSwiping = false;
-      let holdTimer = null;
-      let holdDrag = false;
-      let wasDeleteRevealed = false;
+    this.sectionsContainer.querySelectorAll('.task-item').forEach(item => {
+      const wrapper = item.querySelector('.task-content-wrapper');
+      const swipeAction = item.querySelector('.task-swipe-action');
+      const taskId = item.dataset.taskId;
+      const sectionId = item.dataset.sectionId;
+      const state = { startX: 0, startY: 0, isSwiping: false, holdTimer: null, wasDeleteRevealed: false };
 
       item.draggable = true;
-      item.addEventListener('dragstart', (event) => {
-        event.dataTransfer.setData('text/plain', JSON.stringify({ taskId, sectionId }));
+      item.addEventListener('dragstart', event => {
+        event.dataTransfer.setData('application/x-checklists-task', JSON.stringify({ taskId, sectionId }));
         event.dataTransfer.effectAllowed = 'move';
-      });
-      item.addEventListener('dragover', (event) => {
-        event.preventDefault();
         const rect = item.getBoundingClientRect();
-        item.dataset.dropPosition = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
-        this.sectionsContainer.querySelectorAll('.task-item').forEach(el => el.classList.remove('drag-target'));
-        item.classList.add('drag-target');
+        event.dataTransfer.setDragImage(item, Math.min(event.clientX - rect.left, rect.width), Math.min(event.clientY - rect.top, rect.height));
+        this.beginReorderDrag('task', item);
       });
-      item.addEventListener('dragleave', () => { item.classList.remove('drag-target'); delete item.dataset.dropPosition; });
-      item.addEventListener('drop', (event) => {
-        event.preventDefault();
-        const position = item.dataset.dropPosition || 'before'; item.classList.remove('drag-target');
-        try { const data = JSON.parse(event.dataTransfer.getData('text/plain')); this.moveTask(data.sectionId, data.taskId, sectionId, taskId, position); } catch {}
+      item.addEventListener('dragend', () => {
+        if (this.reorderDrag?.source === item) {
+          this.finishReorderDrag(!!this.reorderDrag.dropped);
+        }
       });
 
-      item.addEventListener('touchstart', (e) => {
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        wasDeleteRevealed = item.classList.contains('delete-revealed');
-        isSwiping = false;
-        holdDrag = false;
-        contentWrapper.style.transition = 'none';
-        holdTimer = setTimeout(() => { holdDrag = true; item.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(25); }, 420);
+      item.addEventListener('touchstart', event => {
+        if (event.target.closest('button')) return;
+        const touch = event.touches[0];
+        state.startX = touch.clientX;
+        state.startY = touch.clientY;
+        state.wasDeleteRevealed = item.classList.contains('delete-revealed');
+        state.isSwiping = false;
+        wrapper.style.transition = 'none';
+        state.holdTimer = setTimeout(() => {
+          this.beginReorderDrag('task', item, { x: state.startX, y: state.startY });
+          if (navigator.vibrate) navigator.vibrate(25);
+        }, 420);
       }, { passive: true });
 
-      item.addEventListener('touchmove', (e) => {
-        if (holdTimer && (Math.abs(e.touches[0].clientX - startX) > 12 || Math.abs(e.touches[0].clientY - startY) > 12)) { clearTimeout(holdTimer); holdTimer = null; }
-        if (holdDrag) {
-          e.preventDefault();
-          const target = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY)?.closest('.task-item');
-          this.sectionsContainer.querySelectorAll('.task-item').forEach(el => el.classList.remove('drag-target'));
-          if (target) { target.dataset.dropPosition = e.touches[0].clientY < target.getBoundingClientRect().top + target.offsetHeight / 2 ? 'before' : 'after'; target.classList.add('drag-target'); }
+      item.addEventListener('touchmove', event => {
+        const touch = event.touches[0];
+        if (this.reorderDrag?.source === item) {
+          event.preventDefault();
+          this.updateReorderDrag(touch.clientX, touch.clientY);
           return;
         }
-        const diffX = e.touches[0].clientX - startX;
-        const diffY = e.touches[0].clientY - startY;
-
-        if (Math.abs(diffX) > Math.abs(diffY) && (diffX < 0 || (wasDeleteRevealed && diffX > 0))) {
-          isSwiping = true;
-          const startOffset = wasDeleteRevealed ? -80 : 0;
+        if (state.holdTimer && (Math.abs(touch.clientX - state.startX) > 12 || Math.abs(touch.clientY - state.startY) > 12)) {
+          clearHoldTimer(state);
+        }
+        const diffX = touch.clientX - state.startX;
+        const diffY = touch.clientY - state.startY;
+        if (Math.abs(diffX) > Math.abs(diffY) && (diffX < 0 || (state.wasDeleteRevealed && diffX > 0))) {
+          state.isSwiping = true;
+          const startOffset = state.wasDeleteRevealed ? -80 : 0;
           const translateX = Math.min(0, Math.max(-100, startOffset + diffX));
-          contentWrapper.style.transform = `translateX(${translateX}px)`;
+          wrapper.style.transform = `translateX(${translateX}px)`;
         }
       }, { passive: false });
 
-      item.addEventListener('touchend', (e) => {
-        clearTimeout(holdTimer); holdTimer = null;
-        if (holdDrag) {
-          item.classList.remove('dragging');
-          const target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY)?.closest('.task-item');
-          this.sectionsContainer.querySelectorAll('.task-item').forEach(el => el.classList.remove('drag-target'));
-          if (target && target !== item) this.moveTask(sectionId, taskId, target.dataset.sectionId, target.dataset.taskId, target.dataset.dropPosition || 'before');
-          holdDrag = false; return;
-        }
-        if (!isSwiping) {
-          contentWrapper.style.transition = '';
+      item.addEventListener('touchend', event => {
+        clearHoldTimer(state);
+        if (this.reorderDrag?.source === item) {
+          this.finishReorderDrag(true);
           return;
         }
-        contentWrapper.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
-        const diffX = e.changedTouches[0].clientX - startX;
-
+        if (!state.isSwiping) {
+          wrapper.style.transition = '';
+          return;
+        }
+        wrapper.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
+        const diffX = event.changedTouches[0].clientX - state.startX;
         if (diffX < -70) {
           item.classList.add('delete-revealed');
           swipeAction.removeAttribute('aria-hidden');
           swipeAction.tabIndex = 0;
-          contentWrapper.style.transform = '';
-        } else if (wasDeleteRevealed && diffX > 40) {
+        } else if (state.wasDeleteRevealed && diffX > 40) {
           item.classList.remove('delete-revealed');
           swipeAction.setAttribute('aria-hidden', 'true');
           swipeAction.tabIndex = -1;
-          contentWrapper.style.transform = '';
-        } else if (wasDeleteRevealed) {
-          contentWrapper.style.transform = '';
-        } else {
-          contentWrapper.style.transform = '';
         }
+        wrapper.style.transform = '';
       });
-    });
 
-    this.sectionsContainer.querySelectorAll('.task-section').forEach(sectionEl => {
-      sectionEl.addEventListener('click', (event) => {
-        if (event.target.closest('button, .task-item')) return;
-        this.activeSectionId = sectionEl.dataset.sectionId;
-        this.activeTaskId = null;
-        this.sectionsContainer.querySelectorAll('.task-section').forEach(el => el.classList.toggle('section-selected', el === sectionEl));
-      });
-      sectionEl.draggable = true;
-      sectionEl.addEventListener('dragstart', event => { if (event.target.closest('.task-item')) { event.preventDefault(); return; } event.dataTransfer.setData('application/x-section', sectionEl.dataset.sectionId); event.dataTransfer.effectAllowed = 'move'; });
-      sectionEl.addEventListener('dragover', event => { if (event.dataTransfer.types.includes('application/x-section')) event.preventDefault(); });
-      sectionEl.addEventListener('drop', event => {
-        const fromId = event.dataTransfer.getData('application/x-section'); if (!fromId) return;
-        event.preventDefault(); this.moveSection(fromId, sectionEl.dataset.sectionId);
+      item.addEventListener('touchcancel', () => {
+        clearHoldTimer(state);
+        if (this.reorderDrag?.source === item) this.finishReorderDrag(false);
+        wrapper.style.transition = '';
+        wrapper.style.transform = '';
       });
     });
 
     this.sectionsContainer.querySelectorAll('.task-section').forEach(section => {
-      let timer;
-      section.addEventListener('touchstart', e => {
-        if (e.target.closest('.task-item, input, button')) return;
-        const y = e.touches[0].clientY;
-        timer = setTimeout(() => { section.dataset.holdDrag = 'true'; section.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(25); }, 420);
-        section.dataset.holdY = y;
-      }, { passive: true });
-      section.addEventListener('touchmove', e => {
-        if (!timer) return;
-        if (Math.abs(e.touches[0].clientY - Number(section.dataset.holdY)) > 12 && section.dataset.holdDrag !== 'true') { clearTimeout(timer); timer = null; }
-        if (section.dataset.holdDrag === 'true') {
-          e.preventDefault();
-          const target = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY)?.closest('.task-section');
-          this.sectionsContainer.querySelectorAll('.task-section').forEach(el => el.classList.remove('drag-target'));
-          if (target) { target.dataset.dropPosition = e.touches[0].clientY < target.getBoundingClientRect().top + target.offsetHeight / 2 ? 'before' : 'after'; target.classList.add('drag-target'); }
-        }
-      }, { passive: false });
-      section.addEventListener('touchend', e => {
-        clearTimeout(timer); timer = null;
-        if (section.dataset.holdDrag === 'true') {
-          const target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY)?.closest('.task-section');
-          if (target && target !== section) this.moveSection(section.dataset.sectionId, target.dataset.sectionId, target.dataset.dropPosition || 'before');
-          delete section.dataset.holdDrag; this.sectionsContainer.querySelectorAll('.task-section').forEach(el => el.classList.remove('dragging', 'drag-target'));
+      section.addEventListener('click', event => {
+        if (event.target.closest('button, .task-item')) return;
+        this.activeSectionId = section.dataset.sectionId;
+        this.activeTaskId = null;
+        this.sectionsContainer.querySelectorAll('.task-section').forEach(el => el.classList.toggle('section-selected', el === section));
+      });
+
+      const handle = section.querySelector('.section-drag-handle');
+      if (!handle) return;
+      handle.draggable = true;
+      handle.addEventListener('dragstart', event => {
+        event.dataTransfer.setData('application/x-section', section.dataset.sectionId);
+        event.dataTransfer.effectAllowed = 'move';
+        const rect = section.getBoundingClientRect();
+        event.dataTransfer.setDragImage(section, Math.min(event.clientX - rect.left, rect.width), Math.min(event.clientY - rect.top, rect.height));
+        this.beginReorderDrag('section', section);
+      });
+      handle.addEventListener('dragend', () => {
+        if (this.reorderDrag?.source === section) {
+          this.finishReorderDrag(!!this.reorderDrag.dropped);
         }
       });
+
+      const state = { startX: 0, startY: 0, holdTimer: null };
+      handle.addEventListener('touchstart', event => {
+        const touch = event.touches[0];
+        state.startX = touch.clientX;
+        state.startY = touch.clientY;
+        state.holdTimer = setTimeout(() => {
+          this.beginReorderDrag('section', section, { x: state.startX, y: state.startY });
+          if (navigator.vibrate) navigator.vibrate(25);
+        }, 420);
+      }, { passive: true });
+      handle.addEventListener('touchmove', event => {
+        const touch = event.touches[0];
+        if (this.reorderDrag?.source === section) {
+          event.preventDefault();
+          this.updateReorderDrag(touch.clientX, touch.clientY);
+        } else if (state.holdTimer && (Math.abs(touch.clientX - state.startX) > 12 || Math.abs(touch.clientY - state.startY) > 12)) {
+          clearHoldTimer(state);
+        }
+      }, { passive: false });
+      handle.addEventListener('touchend', () => {
+        clearHoldTimer(state);
+        if (this.reorderDrag?.source === section) this.finishReorderDrag(true);
+      });
+      handle.addEventListener('touchcancel', () => {
+        clearHoldTimer(state);
+        if (this.reorderDrag?.source === section) this.finishReorderDrag(false);
+      });
     });
+
+    if (!this.sectionsContainer.dataset.reorderBound) {
+      this.sectionsContainer.dataset.reorderBound = 'true';
+      this.sectionsContainer.addEventListener('dragover', event => {
+        if (!this.reorderDrag || this.reorderDrag.touch) return;
+        event.preventDefault();
+        this.updateReorderDrag(event.clientX, event.clientY);
+      });
+      this.sectionsContainer.addEventListener('drop', event => {
+        if (!this.reorderDrag) return;
+        event.preventDefault();
+        this.reorderDrag.dropped = true;
+        this.finishReorderDrag(true);
+      });
+    }
+  }
+
+  beginReorderDrag(kind, source, point = null) {
+    if (this.reorderDrag) this.finishReorderDrag(false);
+
+    const rect = source.getBoundingClientRect();
+    const placeholder = document.createElement('div');
+    placeholder.className = `${kind === 'task' ? 'task-item' : 'task-section'} reorder-placeholder reorder-placeholder-${kind}`;
+    placeholder.style.height = `${rect.height}px`;
+    placeholder.style.width = `${rect.width}px`;
+    placeholder.setAttribute('aria-hidden', 'true');
+    source.parentElement.insertBefore(placeholder, source);
+    source.classList.add('reorder-source');
+
+    let preview = null;
+    if (point) {
+      preview = source.cloneNode(true);
+      preview.classList.remove('reorder-source', 'dragging', 'drag-target', 'task-selected');
+      preview.classList.add('reorder-preview');
+      preview.style.width = `${rect.width}px`;
+      preview.style.height = `${rect.height}px`;
+      preview.style.left = `${point.x - rect.width / 2}px`;
+      preview.style.top = `${point.y - Math.min(point.y - rect.top, rect.height / 2)}px`;
+      document.body.appendChild(preview);
+      source.style.display = 'none';
+    } else {
+      source.style.display = 'none';
+    }
+
+    this.reorderDrag = {
+      kind,
+      source,
+      placeholder,
+      preview,
+      touch: !!point,
+      dropped: false,
+      sourceId: kind === 'task' ? source.dataset.taskId : source.dataset.sectionId,
+      sourceSectionId: source.dataset.sectionId
+    };
+    if (point) this.updateReorderDrag(point.x, point.y);
+  }
+
+  updateReorderDrag(x, y) {
+    const drag = this.reorderDrag;
+    if (!drag) return;
+    if (drag.preview) {
+      drag.preview.style.left = `${x - drag.preview.offsetWidth / 2}px`;
+      drag.preview.style.top = `${y - drag.preview.offsetHeight / 2}px`;
+    }
+
+    if (drag.kind === 'task') {
+      const target = document.elementFromPoint(x, y);
+      const taskItems = [...this.sectionsContainer.querySelectorAll('.task-item:not(.reorder-source):not(.reorder-placeholder)')];
+      const targetTask = target?.closest('.task-item:not(.reorder-source)') ||
+        taskItems.find(task => {
+          const rect = task.getBoundingClientRect();
+          return y >= rect.top && y <= rect.bottom;
+        });
+      const sections = [...this.sectionsContainer.querySelectorAll('.task-section:not(.reorder-source):not(.reorder-placeholder)')];
+      const targetSection = target?.closest('.task-section:not(.reorder-source)') ||
+        sections.find(section => {
+          const rect = section.getBoundingClientRect();
+          return y >= rect.top && y <= rect.bottom;
+        }) ||
+        sections.find(section => y < section.getBoundingClientRect().top + section.getBoundingClientRect().height / 2) ||
+        sections[sections.length - 1];
+      const tasksContainer = targetTask?.parentElement ||
+        target?.closest('.tasks-container') ||
+        targetSection?.querySelector('.tasks-container');
+      if (!tasksContainer || !this.sectionsContainer.contains(tasksContainer)) return;
+
+      const tasks = [...tasksContainer.children].filter(element =>
+        element.classList.contains('task-item') &&
+        !element.classList.contains('reorder-source') &&
+        !element.classList.contains('reorder-placeholder')
+      );
+      const beforeTask = tasks.find(task =>
+        y < task.getBoundingClientRect().top + task.getBoundingClientRect().height / 2
+      ) || null;
+      tasksContainer.insertBefore(drag.placeholder, beforeTask);
+      drag.placeholder.dataset.sectionId = tasksContainer.dataset.sectionId;
+      return;
+    }
+
+    const targetSection = document.elementFromPoint(x, y)?.closest('.task-section:not(.reorder-source)');
+    const sections = [...this.sectionsContainer.children].filter(element =>
+      element.classList.contains('task-section') &&
+      !element.classList.contains('reorder-source') &&
+      !element.classList.contains('reorder-placeholder')
+    );
+    let beforeSection = null;
+    if (targetSection && sections.includes(targetSection)) {
+      const rect = targetSection.getBoundingClientRect();
+      beforeSection = y < rect.top + rect.height / 2 ? targetSection : targetSection.nextElementSibling;
+    } else {
+      beforeSection = sections.find(section => y < section.getBoundingClientRect().top + section.getBoundingClientRect().height / 2) || null;
+    }
+    this.sectionsContainer.insertBefore(drag.placeholder, beforeSection);
+  }
+
+  finishReorderDrag(commit) {
+    const drag = this.reorderDrag;
+    if (!drag) return;
+    const { kind, source, placeholder } = drag;
+    let destination = null;
+
+    if (commit && placeholder.isConnected) {
+      if (kind === 'task') {
+        const container = placeholder.parentElement;
+        const siblings = [...container.children].filter(element =>
+          element.classList.contains('task-item') &&
+          !element.classList.contains('reorder-source') &&
+          !element.classList.contains('reorder-placeholder')
+        );
+        const placeholderIndex = [...container.children]
+          .slice(0, [...container.children].indexOf(placeholder))
+          .filter(element =>
+            element.classList.contains('task-item') &&
+            !element.classList.contains('reorder-source') &&
+            !element.classList.contains('reorder-placeholder')
+          ).length;
+        destination = {
+          sectionId: container.dataset.sectionId,
+          beforeTask: siblings[placeholderIndex] || null,
+          afterTask: siblings[placeholderIndex - 1] || null
+        };
+      } else {
+        const siblings = [...this.sectionsContainer.children].filter(element =>
+          element.classList.contains('task-section') &&
+          !element.classList.contains('reorder-source') &&
+          !element.classList.contains('reorder-placeholder')
+        );
+        const placeholderIndex = [...this.sectionsContainer.children]
+          .slice(0, [...this.sectionsContainer.children].indexOf(placeholder))
+          .filter(element =>
+            element.classList.contains('task-section') &&
+            !element.classList.contains('reorder-source') &&
+            !element.classList.contains('reorder-placeholder')
+          ).length;
+        destination = {
+          beforeSection: siblings[placeholderIndex] || null,
+          afterSection: siblings[placeholderIndex - 1] || null
+        };
+      }
+    }
+
+    placeholder.remove();
+    source.classList.remove('reorder-source');
+    source.style.display = '';
+    drag.preview?.remove();
+    this.reorderDrag = null;
+
+    if (!destination) return;
+    if (kind === 'task') {
+      if (destination.beforeTask) {
+        this.moveTask(drag.sourceSectionId, drag.sourceId, destination.sectionId, destination.beforeTask.dataset.taskId, 'before');
+      } else if (destination.afterTask) {
+        this.moveTask(drag.sourceSectionId, drag.sourceId, destination.sectionId, destination.afterTask.dataset.taskId, 'after');
+      } else {
+        this.moveTask(drag.sourceSectionId, drag.sourceId, destination.sectionId, null, 'after');
+      }
+    } else if (destination.beforeSection) {
+      this.moveSection(drag.sourceId, destination.beforeSection.dataset.sectionId, 'before');
+    } else if (destination.afterSection) {
+      this.moveSection(drag.sourceId, destination.afterSection.dataset.sectionId, 'after');
+    }
   }
 
   moveTask(fromSectionId, taskId, toSectionId, beforeTaskId, position = 'before') {
-    const board = this.getActiveBoard(); if (!board) return;
-    const from = board.sections.find(s => s.id === fromSectionId), to = board.sections.find(s => s.id === toSectionId);
-    const index = from?.tasks?.findIndex(t => t.id === taskId) ?? -1; if (index < 0 || !to) return;
-    this.pushUndoState(); const [task] = from.tasks.splice(index, 1); task.sectionId = to.id;
-    let target = to.tasks.findIndex(t => t.id === beforeTaskId);
-    if (target < 0) target = to.tasks.length;
-    else if (position === 'after') target += 1;
-    if (from === to && target > index) target -= 1;
-    to.tasks.splice(target, 0, task);
-    board.updatedAt = Date.now(); this.save(); this.renderDetail();
+    const board = this.getActiveBoard();
+    if (!board) return;
+    const from = board.sections.find(section => section.id === fromSectionId);
+    const to = board.sections.find(section => section.id === toSectionId);
+    const index = from?.tasks?.findIndex(task => task.id === taskId) ?? -1;
+    if (index < 0 || !to || (from === to && beforeTaskId === taskId)) return;
+
+    this.pushUndoState();
+    const [task] = from.tasks.splice(index, 1);
+    if (!to.tasks) to.tasks = [];
+    const targetIndex = beforeTaskId ? to.tasks.findIndex(item => item.id === beforeTaskId) : -1;
+    const insertIndex = targetIndex < 0
+      ? (position === 'before' && !beforeTaskId ? 0 : to.tasks.length)
+      : targetIndex + (position === 'after' ? 1 : 0);
+    to.tasks.splice(insertIndex, 0, task);
+    if (this.selectedTaskId === taskId) {
+      this.selectedTaskSectionId = to.id;
+      this.activeSectionId = to.id;
+    }
+    board.updatedAt = Date.now();
+    this.save();
+    this.renderDetail();
   }
 
   moveSection(fromId, beforeId, position = 'before') {
-    const board = this.getActiveBoard(); if (!board || fromId === beforeId) return;
-    const from = board.sections.findIndex(s => s.id === fromId), before = board.sections.findIndex(s => s.id === beforeId);
-    if (from < 0 || before < 0) return;
-    this.pushUndoState(); const [section] = board.sections.splice(from, 1); let target = board.sections.findIndex(s => s.id === beforeId); if (position === 'after') target += 1; board.sections.splice(target, 0, section);
-    board.updatedAt = Date.now(); this.save(); this.renderDetail();
+    const board = this.getActiveBoard();
+    if (!board || fromId === beforeId) return;
+    const from = board.sections.findIndex(section => section.id === fromId);
+    if (from < 0 || !board.sections.some(section => section.id === beforeId)) return;
+
+    this.pushUndoState();
+    const [section] = board.sections.splice(from, 1);
+    let target = board.sections.findIndex(item => item.id === beforeId);
+    if (position === 'after') target += 1;
+    board.sections.splice(target, 0, section);
+    board.updatedAt = Date.now();
+    this.save();
+    this.renderDetail();
   }
 
   // --- Board Actions ---
@@ -1557,7 +1744,8 @@ export class UIController {
       this.closeModal(this.newBoardModal);
       this.openBoard(newBoard.id);
       this.showToast(t('boardCreated'));
-      setTimeout(() => { this.detailTitleInput?.focus(); this.detailTitleInput?.select(); }, 80);
+      this.detailTitleInput?.focus();
+      this.detailTitleInput?.select();
     });
 
     document.getElementById('newBoardTitleInput')?.addEventListener('keydown', (e) => {

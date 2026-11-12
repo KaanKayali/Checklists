@@ -4,6 +4,7 @@
    ========================================================================== */
 
 :root {
+  color-scheme: light;
   --primary: #f5b914;
   --primary-hover: #dca70e;
   --primary-light: #fff6db;
@@ -43,6 +44,7 @@
 
 /* Dark Mode Theme */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg-app: #1a202c;
   --bg-card: #2d3748;
   --bg-card-subtle: #242c3d;
@@ -465,6 +467,8 @@ input, button, textarea, select {
   align-items: center;
   justify-content: center;
   text-align: center;
+  width: 100%;
+  min-width: 0;
   padding: 48px 20px;
   color: var(--text-muted);
 }
@@ -482,15 +486,26 @@ input, button, textarea, select {
 }
 
 .empty-state-title {
+  display: block;
+  width: 100%;
+  max-width: 32ch;
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-main);
   margin-bottom: 6px;
+  line-height: 1.4;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .empty-state-sub {
+  display: block;
+  width: 100%;
   font-size: 0.9rem;
-  max-width: 260px;
+  max-width: 32ch;
+  line-height: 1.45;
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 /* Bottom Fade Overlay & Sticky Footer */
@@ -570,7 +585,7 @@ input, button, textarea, select {
    ========================================================================== */
 .detail-header {
   height: auto;
-  min-height: 122px;
+  min-height: 152px;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -647,14 +662,36 @@ input, button, textarea, select {
   line-height: 1.25;
   white-space: normal;
 }
-.task-item.dragging, .task-section.dragging { opacity: .48; }
-.task-item.drag-target, .task-section.drag-target { position: relative; outline: none; }
-.task-item.drag-target::before, .task-section.drag-target::before, .task-item.drag-target::after, .task-section.drag-target::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: var(--primary); z-index: 20; pointer-events: none; }
-.task-item.drag-target::before, .task-section.drag-target::before { top: -4px; display: none; }
-.task-item.drag-target[data-drop-position="before"]::before, .task-section.drag-target[data-drop-position="before"]::before { display: block; }
-.task-item.drag-target::after, .task-section.drag-target::after { bottom: -4px; display: none; }
-.task-item.drag-target[data-drop-position="after"]::after, .task-section.drag-target[data-drop-position="after"]::after { display: block; }
-.task-section.drag-target { outline: none; }
+.reorder-source {
+  display: none !important;
+}
+
+.reorder-placeholder.task-item,
+.reorder-placeholder.task-section {
+  flex: 0 0 auto;
+  pointer-events: none;
+  background: var(--primary-light);
+  border: 0;
+  border-top: 3px solid var(--primary);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.reorder-placeholder.task-section {
+  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  padding: 0;
+}
+
+.reorder-preview {
+  position: fixed !important;
+  z-index: 1000;
+  opacity: 0.94;
+  pointer-events: none;
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.02);
+}
+
 .toolbar-action-btn:disabled { opacity: .35; cursor: default; }
 .task-item.task-selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(var(--primary-rgb), .45); }
 .detail-header { position: relative; }
@@ -695,6 +732,31 @@ input, button, textarea, select {
   justify-content: space-between;
   padding: 4px 0 8px 0;
   gap: 8px;
+}
+
+.section-drag-handle {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-subtle);
+  cursor: grab;
+  touch-action: none;
+}
+
+.section-drag-handle:active {
+  cursor: grabbing;
+  color: var(--primary-hover);
+}
+
+.section-drag-handle svg {
+  width: 18px;
+  height: 18px;
 }
 
 .section-title-input {
@@ -904,12 +966,11 @@ input, button, textarea, select {
 }
 
 /* ==========================================================================
-   Detail View Bottom Toolbar: Sticky and Adapts with Keyboard
+   Detail View Bottom Toolbar
    ========================================================================== */
 .detail-toolbar {
   position: absolute;
   bottom: 0;
-  transition: bottom .12s ease-out;
   left: 0;
   right: 0;
   height: 60px;
