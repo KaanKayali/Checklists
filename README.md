@@ -1,60 +1,80 @@
-# Checklists PWA
+<div align="center">
 
-A lightning-fast, offline-capable Checklists web application built for iPhone (PWA) and Desktop/Laptop.
+# Checklists
 
-![Checklists Banner](assets/icons/brand-logo.png)
+**A simple, fast, offline-ready app for your to-do lists.**<br>
+For phones, tablets, laptops, and desktop computers.
 
-## Overview
+<img src="assets/icons/brand-logo.png" alt="Checklists logo" height="88">
 
-**Checklists** is a Web Application & Progressive Web App (PWA) for Orginazing your Tasks. It provides a native-app experience (optimized for iOS "Add to Home Screen" fullscreen mode) as well as an adaptive widescreen layout for laptops and desktops.
+![Version](https://img.shields.io/badge/version-1.0.0-ffc114?style=flat-square)
+![PWA](https://img.shields.io/badge/PWA-installable-4c8c69?style=flat-square)
 
----
+<br>
 
-## Key Features
+| App language options | Availability |
+|:--|:--|
+| English | Selectable in the app |
+| German (Deutsch) | Selectable in the app |
 
-### Dual-Mode Responsive Experience
-- **Mobile (iPhone / iOS PWA):**
-  - Single-column master-detail workflow with smooth navigation transitions.
-  - Safe area inset handling (`viewport-fit=cover`, `env(safe-area-inset-top)`, `env(safe-area-inset-bottom)`).
-  - Touch gestures including **Swipe Left to Delete** on task rows.
-  - Fullscreen standalone mode without Safari URL bar when added to Home Screen.
-- **Laptop & Desktop:**
-  - Adaptive 2-column widescreen view: Sidebar overview on the left and full task management on the right.
-  - Automatically adapts to large monitors and widescreen laptops instead of a stretched mobile interface.
-
-### Task Management
-- **Circular Checkmark Badge:** High-finish circular badge in `#f5b914` with a crisp white checkmark (`✓`) when completed.
-- **Day / Section Grouping:** Organize tasks into days or custom sections (e.g. `Montag:`, `Mittwoch:`, `Wochenende:`).
-- **Task Editing:** Edit task text directly on desktop. On mobile, tap a task to select it, then use the **T** button to edit; tapping task text alone won’t place a cursor.
-- **Reordering:** Drag tasks and use the section grip to reorder sections; a highlighted insertion line shows where items will land. On touchscreens, press and hold a task or grip to drag.
-- **Add Task:** With no task or section selected, the **+** button adds a task at the bottom of the board.
-- **Mobile Toolbar:** The bottom toolbar stays in place when the keyboard opens.
-- **Empty Tasks:** Blank tasks are removed when you leave them and cleaned up when the app opens.
-- **Mobile Task Deletion:** Swipe a task left to reveal its delete button; it is removed only when you tap the trash icon.
-- **Undo Engine:** A dedicated top-toolbar curved arrow button (and `Ctrl+Z` / `Cmd+Z`) lets you revert checklist edits, toggles, and deletions in real time.
-
-### Pinned Checklists & Organization
-- Pin important checklists to keep them top-of-mind in a dedicated pinned section.
-- Automatic metadata tracking: Created timestamps and relative edit times (e.g., *edited Yesterday*, *bearbeitet vor 2 Stunden*).
-- Multiple sort options: Date Edited, Date Created, Alphabetical (A-Z), and Default / Manual.
+</div>
 
 ---
 
-## Installing as a PWA
+### About
 
-### On iPhone / iPad (iOS Safari)
-1. Open the website in Safari.
-2. Tap the **Share** button (box with upward arrow).
+**Checklists** is a responsive web app and Progressive Web App (PWA) for creating and organizing to-do lists. It is designed to feel at home on a phone, tablet, laptop, or desktop, and can be installed for a convenient app-like experience.
+
+I mainly made this app for myself: a straightforward place to organize everyday tasks, with the features and look I wanted. The app's interface language can be selected in the project: English or German.
+
+> **Current app version: 1.0.0**
+
+### Features
+
+#### One app for mobile and desktop
+- **Mobile (including iPhone and iOS PWA):** A focused, single-column board and task view with smooth navigation.
+- **iPhone layout details:** Safe-area insets keep content clear of the screen edges, and navigation transitions smoothly between the board overview and a selected board.
+- **Touch-friendly controls:** Swipe a task left to reveal its delete button, and press and hold tasks or section grips to reorder them.
+- **Installable experience:** Add the app to your iPhone or iPad Home Screen for standalone fullscreen use.
+- **Laptop and desktop:** An adaptive two-column layout shows the board overview alongside task management.
+
+#### Task management
+- **Boards and sections:** Group tasks into days or custom sections such as `Monday`, `Wednesday`, `Weekend`, or `In school`.
+- **Task editing:** Edit task text directly on desktop. On mobile, tap a task to select it and then use the **T** button to edit; tapping the text alone does not place a cursor.
+- **Reordering:** Drag tasks and use a section grip to reorder sections. A highlighted insertion line previews where an item will land.
+- **Add tasks:** With no task or section selected, the **+** button adds a task to the bottom of the board.
+- **Quick actions:** Mark tasks complete and undo checklist edits, toggles, or deletions. Undo is available from the curved-arrow button in the top toolbar and with `Ctrl+Z` / `Cmd+Z`.
+- **Mobile toolbar:** The bottom toolbar stays in place when the keyboard opens.
+- **Task deletion on mobile:** Swipe left to reveal the delete button; a task is deleted only when you tap the trash icon.
+
+#### Organization and preferences
+- **Pinned checklists:** Keep important boards close at hand in a dedicated pinned section.
+- **Sort options:** Sort by date edited, date created, alphabetically (A–Z), or the default manual order.
+- **Created and edited times:** Keep track of when a checklist was created and last updated, with relative edit times such as *edited Yesterday*.
+- **English and German:** Switch the app language between English and German.
+
+#### Data and offline use
+- **Offline-ready:** The app is designed to work offline after it has been loaded.
+- **Local storage:** Your checklists are saved in your browser on your device.
+- **JSON import and export:** Back up or move your checklist data.
+
+### Install the app
+
+#### iPhone or iPad (Safari)
+1. Open the app website in Safari.
+2. Tap **Share** (the box with the upward arrow).
 3. Scroll down and tap **Add to Home Screen**.
-4. Confirm by tapping **Add**. The app will launch in standalone fullscreen mode just like a native app.
+4. Tap **Add**. Checklists will open in its own fullscreen window.
 
-### On Mac, Windows & Android (Chrome / Edge / Safari)
-1. Visit the app URL in your browser.
-2. Look for the **Install** icon in the address bar (or menu > *Install Checklists*).
-3. Click **Install** to add Checklists to your desktop or app drawer.
+#### Mac, Windows, Android, and other supported browsers
+1. Open the app website in your browser.
+2. Find the **Install** icon in the address bar, or open the browser menu and choose **Install Checklists**.
+3. Confirm to add Checklists to your device.
 
----
+### Future plans
 
-## License
+An account-management backend with login and online synchronization may be added in a future update. This would let users sync their checklists across devices. **Accounts and cloud sync are not available in the current version**; checklist data is currently stored locally in the browser.
+
+### License
 
 This project is open-source under the [MIT License](LICENSE).
