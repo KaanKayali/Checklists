@@ -2,7 +2,7 @@
 
 A lightning-fast, offline-capable Checklists web application built for iPhone (PWA) and Desktop/Laptop.
 
-![Checklists Banner](assets/icons/logo.png)
+![Checklists Banner](assets/icons/brand-logo.png)
 
 ## Overview
 

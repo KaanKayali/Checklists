@@ -74,6 +74,7 @@ export class UIController {
     this.selectedTaskId = null;
     this.selectedTaskSectionId = null;
     this.editingTaskId = null;
+    this.animatingTaskId = null;
 
     // Modals
     this.settingsModal = document.getElementById('settingsModal');
@@ -644,9 +645,7 @@ export class UIController {
 
         <div class="task-content-wrapper">
           <div class="custom-checkbox" data-task-id="${task.id}" data-section-id="${sectionId}" title="${t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel')}" aria-label="${t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel')}" role="checkbox" aria-checked="${isCompleted}" tabindex="0">
-            <svg viewBox="0 0 24 24">
-              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-            </svg>
+            ${isCompleted ? `<img class="checkbox-mark" src="assets/images/checkbox-animation/${this.animatingTaskId === task.id ? 'frame-00.png' : 'checked.png'}" alt="" aria-hidden="true">` : ''}
           </div>
 
           <!-- Auto-resizing textarea with NO manual resize handle and NO placeholder -->
@@ -884,12 +883,29 @@ export class UIController {
     const task = sec.tasks.find(t => t.id === taskId);
     if (!task) return;
 
+    const shouldAnimate = !task.completed && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     task.completed = !task.completed;
+    this.animatingTaskId = shouldAnimate ? taskId : null;
     board.updatedAt = Date.now();
     this.save();
     this.clearTaskSelection();
     this.renderOverview();
     this.renderDetail();
+    if (shouldAnimate) this.playCheckboxAnimation(taskId);
+    this.animatingTaskId = null;
+  }
+
+  playCheckboxAnimation(taskId) {
+    const checkbox = Array.from(this.sectionsContainer?.querySelectorAll('.custom-checkbox') || [])
+      .find(element => element.dataset.taskId === taskId);
+    const mark = checkbox?.querySelector('.checkbox-mark');
+    if (!mark) return;
+
+    ['frame-01.png', 'frame-02.png', 'frame-03.png', 'frame-04.png', 'frame-05.png'].forEach((frame, index) => {
+      window.setTimeout(() => {
+        if (mark.isConnected) mark.src = `assets/images/checkbox-animation/${frame}`;
+      }, (index + 1) * 24);
+    });
   }
 
   crossOutActiveTask() {

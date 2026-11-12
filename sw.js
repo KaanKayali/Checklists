@@ -1,4 +1,4 @@
-const CACHE_NAME = 'checklists-v1.0.2';
+const CACHE_NAME = 'checklists-v1.0.3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -8,9 +8,18 @@ const ASSETS_TO_CACHE = [
   './assets/js/storage.js',
   './assets/js/ui.js',
   './assets/js/i18n.js',
-  './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png',
-  './assets/icons/logo.png'
+  './assets/icons/favicon.png',
+  './assets/icons/apple-touch-icon.png',
+  './assets/icons/app-icon-192.png',
+  './assets/icons/app-icon-512.png',
+  './assets/icons/brand-logo.png',
+  './assets/images/checkbox-animation/checked.png',
+  './assets/images/checkbox-animation/frame-00.png',
+  './assets/images/checkbox-animation/frame-01.png',
+  './assets/images/checkbox-animation/frame-02.png',
+  './assets/images/checkbox-animation/frame-03.png',
+  './assets/images/checkbox-animation/frame-04.png',
+  './assets/images/checkbox-animation/frame-05.png'
 ];
 
 self.addEventListener('install', (event) => {
