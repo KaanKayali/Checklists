@@ -72,8 +72,10 @@ export class UIController {
     this.btnCrossOut = document.getElementById('btnCrossOut');
     this.btnClearText = document.getElementById('btnClearText');
     this.btnCompleteTask = document.getElementById('btnCompleteTask');
+    this.btnEditTask = document.getElementById('btnEditTask');
     this.selectedTaskId = null;
     this.selectedTaskSectionId = null;
+    this.editingTaskId = null;
 
     // Modals
     this.settingsModal = document.getElementById('settingsModal');
@@ -375,6 +377,7 @@ export class UIController {
   // --- View Switching ---
   openBoard(id, pushHistory = true) {
     this.saveScrollPosition();
+    this.clearTaskSelection();
     this.state.activeBoardId = id;
     this.activeTaskId = null;
     this.undoStack = [];
@@ -401,6 +404,7 @@ export class UIController {
   }
 
   closeDetail() {
+    this.clearTaskSelection();
     this.cleanUpEmptyTasks();
     this.saveScrollPosition();
     this.viewContainer.classList.remove('detail-active');
@@ -412,6 +416,7 @@ export class UIController {
 
   // --- Automatic Cleanup of Empty Tasks ---
   cleanUpEmptyTasks() {
+    if (window.innerWidth < 860) return;
     const board = this.getActiveBoard();
     if (!board || !board.sections) return;
 
@@ -470,7 +475,7 @@ export class UIController {
               <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
                 <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 2 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
               </svg>
-            </div>
+            </button>
             <div class="empty-state-title">${t('noBoardsYet')}</div>
             <div class="empty-state-sub">${t('noBoardsSub')}</div>
           </div>
@@ -540,6 +545,7 @@ export class UIController {
   renderDetail() {
     const board = this.getActiveBoard();
     if (!board) {
+      this.clearTaskSelection();
       if (this.detailTitleInput) this.detailTitleInput.value = '';
       if (this.metaCreated) this.metaCreated.textContent = '';
       if (this.metaEdited) this.metaEdited.textContent = '';
@@ -620,6 +626,15 @@ export class UIController {
       }
     }
 
+    if (this.selectedTaskId) {
+      const selectedSection = board.sections?.find(section => section.id === this.selectedTaskSectionId);
+      if (selectedSection?.tasks?.some(task => task.id === this.selectedTaskId)) {
+        this.selectTask(this.selectedTaskSectionId, this.selectedTaskId);
+      } else {
+        this.clearTaskSelection();
+      }
+    }
+
     this.updateUndoButtonState();
   }
 
@@ -633,11 +648,11 @@ export class UIController {
            data-section-id="${sectionId}">
         
         <!-- Swipe Delete Action Underneath for Mobile -->
-        <div class="task-swipe-action" data-task-id="${task.id}" data-section-id="${sectionId}">
+        <button type="button" class="task-swipe-action" data-task-id="${task.id}" data-section-id="${sectionId}" aria-label="${t('delete')}" aria-hidden="true" tabindex="-1">
           <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
             <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
           </svg>
-        </div>
+        </button>
 
         <div class="task-content-wrapper">
           <div class="custom-checkbox" data-task-id="${task.id}" data-section-id="${sectionId}" title="${t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel')}" aria-label="${t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel')}" role="checkbox" aria-checked="${isCompleted}" tabindex="0">
@@ -647,7 +662,7 @@ export class UIController {
           </div>
 
           <!-- Auto-resizing textarea with NO manual resize handle and NO placeholder -->
-          <textarea class="task-input" 
+          <textarea class="task-input" ${window.innerWidth < 860 && this.editingTaskId !== task.id ? 'readonly' : ''}
                     rows="1"
                     data-task-id="${task.id}" 
                     data-section-id="${sectionId}">${this.escapeHTML(task.text || '')}</textarea>
@@ -727,19 +742,15 @@ export class UIController {
       };
       autoResize();
 
-      // Focus: track active cursor
+      // Focus: track the active task.
       input.addEventListener('focus', () => {
         this.activeTaskId = taskId;
         this.activeSectionId = sectionId;
         this.selectTask(sectionId, taskId);
       });
 
-      // Blur: automatically delete if task text is empty string!
-      input.addEventListener('blur', () => {
-        if (input.value.trim() === '' && !input.dataset.keepEmpty) {
-          this.deleteTask(sectionId, taskId, false);
-        }
-        delete input.dataset.keepEmpty;
+      input.addEventListener('pointerdown', (event) => {
+        if (window.innerWidth < 860 && input.readOnly) event.preventDefault();
       });
 
       // Text input change
@@ -761,9 +772,18 @@ export class UIController {
 
       // Enter finishes editing; the selected task remains available to toolbar actions.
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && input.value.trim() === '') {
+        if (window.innerWidth >= 860 && e.key === 'Backspace' && input.value.trim() === '') {
           e.preventDefault();
           this.deleteTaskAndFocusPrev(sectionId, taskId);
+        }
+      });
+    });
+
+    this.sectionsContainer.querySelectorAll('.task-content-wrapper').forEach(wrapper => {
+      wrapper.addEventListener('click', () => {
+        if (window.innerWidth < 860 && !wrapper.closest('.task-item').classList.contains('delete-revealed')) {
+          const item = wrapper.closest('.task-item');
+          this.selectTask(item.dataset.sectionId, item.dataset.taskId);
         }
       });
     });
@@ -779,6 +799,15 @@ export class UIController {
       });
     });
 
+    this.sectionsContainer.querySelectorAll('.task-swipe-action').forEach(button => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const { taskId, sectionId } = button.dataset;
+        this.deleteTask(sectionId, taskId);
+        this.showToast(t('taskDeleted'));
+      });
+    });
+
     this.bindSwipeGestures();
     if (!this.sectionsContainer.dataset.selectionBound) {
       this.sectionsContainer.dataset.selectionBound = 'true';
@@ -789,17 +818,70 @@ export class UIController {
   }
 
   selectTask(sectionId, taskId) {
+    if (this.editingTaskId && this.editingTaskId !== taskId) {
+      const editingInput = this.sectionsContainer?.querySelector(`.task-input[data-task-id="${this.editingTaskId}"]`);
+      if (editingInput) {
+        editingInput.readOnly = true;
+        editingInput.blur();
+      }
+      this.editingTaskId = null;
+      this.btnEditTask?.setAttribute('aria-label', t('editTaskLabel'));
+      if (this.btnEditTask) this.btnEditTask.title = t('editTaskLabel');
+    }
     this.selectedTaskId = taskId;
     this.selectedTaskSectionId = sectionId;
+    this.activeTaskId = taskId;
+    this.activeSectionId = sectionId;
     this.sectionsContainer?.querySelectorAll('.task-item').forEach(item => item.classList.toggle('task-selected', item.dataset.taskId === taskId));
-    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask].forEach(button => { if (button) button.disabled = !taskId; });
+    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask, this.btnEditTask].forEach(button => { if (button) button.disabled = !taskId; });
+    const task = this.getActiveBoard()?.sections?.find(section => section.id === sectionId)?.tasks?.find(item => item.id === taskId);
+    if (task && this.btnCompleteTask) {
+      const label = t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel');
+      this.btnCompleteTask.title = label;
+      this.btnCompleteTask.setAttribute('aria-label', label);
+    }
   }
 
   clearTaskSelection() {
+    const editingInput = this.editingTaskId && this.sectionsContainer?.querySelector(`.task-input[data-task-id="${this.editingTaskId}"]`);
+    if (editingInput) {
+      editingInput.readOnly = true;
+      editingInput.blur();
+    }
+    this.editingTaskId = null;
     this.selectedTaskId = null;
     this.selectedTaskSectionId = null;
+    this.activeTaskId = null;
+    this.activeSectionId = null;
     this.sectionsContainer?.querySelectorAll('.task-item').forEach(item => item.classList.remove('task-selected'));
-    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask].forEach(button => { if (button) button.disabled = true; });
+    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask, this.btnEditTask].forEach(button => { if (button) button.disabled = true; });
+    this.btnEditTask?.setAttribute('aria-label', t('editTaskLabel'));
+    if (this.btnEditTask) this.btnEditTask.title = t('editTaskLabel');
+  }
+
+  editSelectedTask() {
+    if (window.innerWidth >= 860 || !this.selectedTaskId) return;
+    if (this.editingTaskId === this.selectedTaskId) {
+      const input = this.sectionsContainer?.querySelector(`.task-input[data-task-id="${this.selectedTaskId}"]`);
+      if (input) {
+        input.readOnly = true;
+        input.blur();
+      }
+      this.editingTaskId = null;
+      this.btnEditTask?.setAttribute('aria-label', t('editTaskLabel'));
+      if (this.btnEditTask) this.btnEditTask.title = t('editTaskLabel');
+      return;
+    }
+
+    this.editingTaskId = this.selectedTaskId;
+    const input = this.sectionsContainer?.querySelector(`.task-input[data-task-id="${this.editingTaskId}"]`);
+    if (input) {
+      input.readOnly = false;
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+    this.btnEditTask?.setAttribute('aria-label', t('finishEditingTaskLabel'));
+    if (this.btnEditTask) this.btnEditTask.title = t('finishEditingTaskLabel');
   }
 
   // --- Task Operations ---
@@ -903,6 +985,9 @@ export class UIController {
     board.updatedAt = Date.now();
     this.activeTaskId = newTask.id;
     this.activeSectionId = sec.id;
+    this.selectedTaskId = newTask.id;
+    this.selectedTaskSectionId = sec.id;
+    if (window.innerWidth < 860) this.editingTaskId = newTask.id;
     this.save();
     this.renderDetail();
 
@@ -959,6 +1044,9 @@ export class UIController {
     board.updatedAt = Date.now();
     this.activeTaskId = newTask.id;
     this.activeSectionId = targetSection.id;
+    this.selectedTaskId = newTask.id;
+    this.selectedTaskSectionId = targetSection.id;
+    if (window.innerWidth < 860) this.editingTaskId = newTask.id;
     this.save();
     this.renderDetail();
 
@@ -979,6 +1067,8 @@ export class UIController {
     const sec = board.sections.find(s => s.id === sectionId);
     if (!sec || !sec.tasks) return;
 
+    if (this.selectedTaskId === taskId) this.clearTaskSelection();
+    if (this.editingTaskId === taskId) this.editingTaskId = null;
     sec.tasks = sec.tasks.filter(t => t.id !== taskId);
     if (this.activeTaskId === taskId) {
       this.activeTaskId = null;
@@ -1025,6 +1115,11 @@ export class UIController {
 
     board.sections.push(newSec);
     board.updatedAt = Date.now();
+    this.activeTaskId = newSec.tasks[0].id;
+    this.activeSectionId = newSec.id;
+    this.selectedTaskId = newSec.tasks[0].id;
+    this.selectedTaskSectionId = newSec.id;
+    if (window.innerWidth < 860) this.editingTaskId = newSec.tasks[0].id;
     this.save();
     this.renderDetail();
 
@@ -1065,6 +1160,7 @@ export class UIController {
       let isSwiping = false;
       let holdTimer = null;
       let holdDrag = false;
+      let wasDeleteRevealed = false;
 
       item.draggable = true;
       item.addEventListener('dragstart', (event) => {
@@ -1088,6 +1184,7 @@ export class UIController {
       item.addEventListener('touchstart', (e) => {
         startX = e.touches[0].clientX;
         startY = e.touches[0].clientY;
+        wasDeleteRevealed = item.classList.contains('delete-revealed');
         isSwiping = false;
         holdDrag = false;
         contentWrapper.style.transition = 'none';
@@ -1106,12 +1203,10 @@ export class UIController {
         const diffX = e.touches[0].clientX - startX;
         const diffY = e.touches[0].clientY - startY;
 
-        if (Math.abs(diffX) > Math.abs(diffY) && diffX < 0) {
+        if (Math.abs(diffX) > Math.abs(diffY) && (diffX < 0 || (wasDeleteRevealed && diffX > 0))) {
           isSwiping = true;
-          let translateX = diffX;
-          if (translateX < -80) {
-            translateX = -80 + (diffX + 80) * 0.2;
-          }
+          const startOffset = wasDeleteRevealed ? -80 : 0;
+          const translateX = Math.min(0, Math.max(-100, startOffset + diffX));
           contentWrapper.style.transform = `translateX(${translateX}px)`;
         }
       }, { passive: false });
@@ -1125,26 +1220,29 @@ export class UIController {
           if (target && target !== item) this.moveTask(sectionId, taskId, target.dataset.sectionId, target.dataset.taskId, target.dataset.dropPosition || 'before');
           holdDrag = false; return;
         }
-        if (!isSwiping) return;
+        if (!isSwiping) {
+          contentWrapper.style.transition = '';
+          return;
+        }
         contentWrapper.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
         const diffX = e.changedTouches[0].clientX - startX;
 
         if (diffX < -70) {
-          contentWrapper.style.transform = 'translateX(-100%)';
-          setTimeout(() => {
-            this.deleteTask(sectionId, taskId);
-            this.showToast(t('taskDeleted'));
-          }, 200);
+          item.classList.add('delete-revealed');
+          swipeAction.removeAttribute('aria-hidden');
+          swipeAction.tabIndex = 0;
+          contentWrapper.style.transform = '';
+        } else if (wasDeleteRevealed && diffX > 40) {
+          item.classList.remove('delete-revealed');
+          swipeAction.setAttribute('aria-hidden', 'true');
+          swipeAction.tabIndex = -1;
+          contentWrapper.style.transform = '';
+        } else if (wasDeleteRevealed) {
+          contentWrapper.style.transform = '';
         } else {
-          contentWrapper.style.transform = 'translateX(0)';
+          contentWrapper.style.transform = '';
         }
       });
-
-      if (swipeAction) {
-        swipeAction.addEventListener('click', () => {
-          this.deleteTask(sectionId, taskId);
-        });
-      }
     });
 
     this.sectionsContainer.querySelectorAll('.task-section').forEach(sectionEl => {
@@ -1509,6 +1607,7 @@ export class UIController {
         this.addTaskAtCursorOrBottom();
       });
     }
+    this.btnEditTask?.addEventListener('click', () => this.editSelectedTask());
     this.btnCompleteTask?.addEventListener('click', () => this.toggleSelectedTaskCompleted());
 
     if (this.btnAddSection) {
@@ -1536,8 +1635,6 @@ export class UIController {
         this.crossOutActiveTask();
       });
     }
-    this.btnCompleteTask?.addEventListener('click', () => this.toggleSelectedTaskCompleted());
-
     if (this.btnClearText) {
       this.btnClearText.addEventListener('click', () => {
         this.clearActiveTaskText();

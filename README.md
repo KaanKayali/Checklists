@@ -22,10 +22,11 @@ A lightning-fast, offline-capable Checklists web application built for iPhone (P
   - Adaptive 2-column widescreen view: Sidebar overview on the left and full task management on the right.
   - Automatically adapts to large monitors and widescreen laptops instead of a stretched mobile interface.
 
-### Task Management & Cursor Logic
-- **Circular Checkmark Badge:** High-finish circular badge in `#ffc114` with a crisp white checkmark (`✓`) when completed.
+### Task Management
+- **Circular Checkmark Badge:** High-finish circular badge in `#f5b914` with a crisp white checkmark (`✓`) when completed.
 - **Day / Section Grouping:** Organize tasks into days or custom sections (e.g. `Montag:`, `Mittwoch:`, `Wochenende:`).
-- **Cursor Logic:** When a task row has focus, editing actions (e.g. **Cross Out**, **Clear Text `""`**, or **Add Task**) automatically target the cursor position. Pressing `Enter` creates a new item directly beneath the current task line; `Backspace` on an empty line removes it and returns focus to the preceding task.
+- **Task Editing:** Edit task text directly on desktop. On mobile, tap a task to select it, then use the **T** button to edit; tapping task text alone won’t place a cursor.
+- **Mobile Task Deletion:** Swipe a task left to reveal its delete button; it is removed only when you tap the trash icon.
 - **Undo Engine:** A dedicated top-toolbar curved arrow button (and `Ctrl+Z` / `Cmd+Z`) lets you revert checklist edits, toggles, and deletions in real time.
 
 ### Pinned Checklists & Organization

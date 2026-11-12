@@ -291,15 +291,17 @@
             </button>
           </div>
 
-          <!-- Right standalone circle button for Add Task -->
-          <button class="toolbar-right-add" id="btnAddTask" data-i18n-title="addTaskLabel" data-i18n-aria-label="addTaskLabel" title="Add task" aria-label="Add task">
-            <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
-              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
-            </svg>
-          </button>
-          <button class="toolbar-action-btn toolbar-complete-btn" id="btnCompleteTask" data-i18n-title="completeTaskLabel" data-i18n-aria-label="completeTaskLabel" title="Complete task" aria-label="Complete task" disabled>
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="m9 16.2-3.5-3.5L4 14.2l5 5L20.5 7.7 19 6.2z"/></svg>
-          </button>
+          <div class="toolbar-right-group">
+            <button class="toolbar-right-add toolbar-edit-btn" id="btnEditTask" data-i18n-title="editTaskLabel" data-i18n-aria-label="editTaskLabel" title="Edit task" aria-label="Edit task" disabled>T</button>
+            <button class="toolbar-right-add" id="btnAddTask" data-i18n-title="addTaskLabel" data-i18n-aria-label="addTaskLabel" title="Add task" aria-label="Add task">
+              <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
+                <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+              </svg>
+            </button>
+            <button class="toolbar-complete-btn" id="btnCompleteTask" data-i18n-title="completeTaskLabel" data-i18n-aria-label="completeTaskLabel" title="Complete task" aria-label="Complete task" disabled>
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="m9 16.2-3.5-3.5L4 14.2l5 5L20.5 7.7 19 6.2z"/></svg>
+            </button>
+          </div>
         </footer>
       </main>
 
