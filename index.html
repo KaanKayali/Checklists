@@ -52,9 +52,9 @@
 
             <!-- Selection Mode Action Bar (appears when selecting boards) -->
             <div class="selection-action-bar" id="selectionActionBar" style="display: none;">
-              <button class="btn btn-danger" id="btnDeleteSelected" style="padding: 6px 12px; font-size: 0.85rem;" disabled>
+              <button class="btn btn-secondary" id="btnDeleteSelected" aria-label="Delete selected boards" title="Delete selected boards" style="padding: 6px 12px; font-size: 0.85rem;" disabled>
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
-                <span id="deleteSelectedText">Delete (0)</span>
+                <span id="deleteSelectedText">(0)</span>
               </button>
               <button class="btn btn-secondary" id="btnCancelSelection" style="padding: 6px 12px; font-size: 0.85rem;">
                 <span data-i18n="doneSelection">Done</span>
@@ -213,14 +213,14 @@
                 <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
               </svg>
             </button>
-            <div class="detail-title-container">
+          </div>
+          <div class="detail-title-container">
               <input type="text" class="detail-title-input" id="detailTitleInput" data-i18n-placeholder="boardNameLabel" placeholder="Board name">
               <!-- Stacked Created and Edited Timestamps (untereinander) -->
               <div class="detail-meta-stacked" id="detailTimestamps">
                 <span id="metaCreated">Created ...</span>
                 <span id="metaEdited">Edited ...</span>
               </div>
-            </div>
           </div>
 
           <!-- Detail Header Actions: Undo and 3-Dots in White Circles -->
@@ -228,7 +228,7 @@
             <!-- Undo Button (Curved arrow): White Circle -->
             <button class="btn-circle" id="btnUndo" disabled data-i18n-title="undoLabel" data-i18n-aria-label="undoLabel" title="Undo (Ctrl+Z)" aria-label="Undo (Ctrl+Z)">
               <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
+                <path d="M10 4 3 11l7 7v-5c5.2 0 8.6 1.7 11 6-1.1-7-5-11-11-11V4z"/>
               </svg>
             </button>
 
@@ -252,7 +252,7 @@
             <span id="pinMenuLabel" data-i18n="pin">Pin Board</span>
           </button>
           <div class="menu-divider"></div>
-          <button class="menu-item danger" id="menuItemDelete">
+          <button class="menu-item" id="menuItemDelete">
             <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
               <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
             </svg>
@@ -296,6 +296,9 @@
             <svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
             </svg>
+          </button>
+          <button class="toolbar-action-btn toolbar-complete-btn" id="btnCompleteTask" data-i18n-title="completeTaskLabel" data-i18n-aria-label="completeTaskLabel" title="Complete task" aria-label="Complete task" disabled>
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="m9 16.2-3.5-3.5L4 14.2l5 5L20.5 7.7 19 6.2z"/></svg>
           </button>
         </footer>
       </main>
@@ -381,7 +384,7 @@
         </div>
 
         <div class="form-group" style="margin-top: 6px;">
-          <button class="btn btn-danger" id="btnResetAllData" style="width: 100%;">
+          <button class="btn btn-secondary" id="btnResetAllData" style="width: 100%;">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
             <span data-i18n="resetData">Delete Data</span>
           </button>
@@ -404,7 +407,7 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-secondary" id="btnConfirmCancel" data-i18n="cancel">Cancel</button>
-        <button class="btn btn-danger" id="btnConfirmAction" data-i18n="delete">Delete</button>
+        <button class="btn btn-secondary" id="btnConfirmAction" data-i18n="delete">Delete</button>
       </div>
     </div>
   </div>

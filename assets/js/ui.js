@@ -71,6 +71,9 @@ export class UIController {
     this.btnAddSection = document.getElementById('btnAddSection');
     this.btnCrossOut = document.getElementById('btnCrossOut');
     this.btnClearText = document.getElementById('btnClearText');
+    this.btnCompleteTask = document.getElementById('btnCompleteTask');
+    this.selectedTaskId = null;
+    this.selectedTaskSectionId = null;
 
     // Modals
     this.settingsModal = document.getElementById('settingsModal');
@@ -113,7 +116,7 @@ export class UIController {
       const onViewportChange = () => {
         if (!this.detailToolbar) return;
         const currentViewport = window.visualViewport;
-        const offsetBottom = window.innerHeight - (currentViewport.height + currentViewport.offsetTop);
+        const offsetBottom = Math.max(0, window.innerHeight - (currentViewport.height + currentViewport.offsetTop));
         if (offsetBottom > 50) {
           // Keyboard is open! Stick toolbar directly above keyboard
           this.detailToolbar.style.bottom = `${offsetBottom}px`;
@@ -342,7 +345,7 @@ export class UIController {
   updateSelectionActionBar() {
     const count = this.selectedBoardIds.size;
     if (this.deleteSelectedText) {
-      this.deleteSelectedText.textContent = `${t('delete')} (${count})`;
+      this.deleteSelectedText.textContent = `(${count})`;
     }
     if (this.btnDeleteSelected) {
       this.btnDeleteSelected.disabled = count === 0;
@@ -685,6 +688,7 @@ export class UIController {
     // Section title change
     const sectionInputs = this.sectionsContainer.querySelectorAll('.section-title-input');
     sectionInputs.forEach(input => {
+      input.addEventListener('focus', () => { this.activeSectionId = input.dataset.sectionId; this.activeTaskId = null; });
       input.addEventListener('input', () => {
         const secId = input.getAttribute('data-section-id');
         const board = this.getActiveBoard();
@@ -705,7 +709,9 @@ export class UIController {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const secId = btn.getAttribute('data-section-id');
-        this.deleteSection(secId);
+        const board = this.getActiveBoard();
+        const section = board?.sections?.find(item => item.id === secId);
+        this.showConfirmDialog(t('delete'), t('confirmDeleteSection', section?.title || ''), t('delete'), () => this.deleteSection(secId));
       });
     });
 
@@ -725,13 +731,15 @@ export class UIController {
       input.addEventListener('focus', () => {
         this.activeTaskId = taskId;
         this.activeSectionId = sectionId;
+        this.selectTask(sectionId, taskId);
       });
 
       // Blur: automatically delete if task text is empty string!
       input.addEventListener('blur', () => {
-        if (input.value.trim() === '') {
+        if (input.value.trim() === '' && !input.dataset.keepEmpty) {
           this.deleteTask(sectionId, taskId, false);
         }
+        delete input.dataset.keepEmpty;
       });
 
       // Text input change
@@ -751,12 +759,9 @@ export class UIController {
         }
       });
 
-      // Keydown: Enter creates next task, Backspace on empty deletes task
+      // Enter finishes editing; the selected task remains available to toolbar actions.
       input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          this.insertTaskBelow(sectionId, taskId);
-        } else if (e.key === 'Backspace' && input.value.trim() === '') {
+        if (e.key === 'Backspace' && input.value.trim() === '') {
           e.preventDefault();
           this.deleteTaskAndFocusPrev(sectionId, taskId);
         }
@@ -775,6 +780,26 @@ export class UIController {
     });
 
     this.bindSwipeGestures();
+    if (!this.sectionsContainer.dataset.selectionBound) {
+      this.sectionsContainer.dataset.selectionBound = 'true';
+      document.addEventListener('pointerdown', event => {
+        if (!event.target.closest('.task-item') && !event.target.closest('.detail-toolbar')) this.clearTaskSelection();
+      });
+    }
+  }
+
+  selectTask(sectionId, taskId) {
+    this.selectedTaskId = taskId;
+    this.selectedTaskSectionId = sectionId;
+    this.sectionsContainer?.querySelectorAll('.task-item').forEach(item => item.classList.toggle('task-selected', item.dataset.taskId === taskId));
+    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask].forEach(button => { if (button) button.disabled = !taskId; });
+  }
+
+  clearTaskSelection() {
+    this.selectedTaskId = null;
+    this.selectedTaskSectionId = null;
+    this.sectionsContainer?.querySelectorAll('.task-item').forEach(item => item.classList.remove('task-selected'));
+    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask].forEach(button => { if (button) button.disabled = true; });
   }
 
   // --- Task Operations ---
@@ -794,28 +819,28 @@ export class UIController {
     this.renderDetail();
   }
 
+  toggleSelectedTaskCompleted() {
+    if (this.selectedTaskId) this.toggleTaskCompleted(this.selectedTaskSectionId, this.selectedTaskId);
+  }
+
   crossOutActiveTask() {
+    if (!this.selectedTaskId) return;
     this.pushUndoState();
     const board = this.getActiveBoard();
     if (!board || !board.sections) return;
 
     let targetTask = null;
 
-    if (this.activeTaskId) {
+    if (this.selectedTaskId) {
       for (const sec of board.sections) {
         if (sec.tasks) {
-          const found = sec.tasks.find(t => t.id === this.activeTaskId);
+          const found = sec.tasks.find(t => t.id === this.selectedTaskId);
           if (found) {
             targetTask = found;
             break;
           }
         }
       }
-    }
-
-    if (!targetTask && board.sections[0]?.tasks?.length > 0) {
-      const sec = board.sections[0];
-      targetTask = sec.tasks[sec.tasks.length - 1];
     }
 
     if (targetTask) {
@@ -828,13 +853,14 @@ export class UIController {
   }
 
   clearActiveTaskText() {
+    if (!this.selectedTaskId) return;
     this.pushUndoState();
     const board = this.getActiveBoard();
-    if (!board || !board.sections || !this.activeTaskId) return;
+    if (!board || !board.sections || !this.selectedTaskId) return;
 
     for (const sec of board.sections) {
       if (sec.tasks) {
-        const task = sec.tasks.find(t => t.id === this.activeTaskId);
+        const task = sec.tasks.find(t => t.id === this.selectedTaskId);
         if (task) {
           task.text = '';
           board.updatedAt = Date.now();
@@ -908,6 +934,8 @@ export class UIController {
       const found = board.sections.find(s => s.id === this.activeSectionId);
       if (found) targetSection = found;
     }
+    const focusedSectionTitle = document.activeElement?.closest('.task-section')?.dataset.sectionId;
+    if (focusedSectionTitle) targetSection = board.sections.find(s => s.id === focusedSectionTitle) || targetSection;
     if (!targetSection.tasks) targetSection.tasks = [];
 
     const newTask = {
@@ -1015,6 +1043,7 @@ export class UIController {
     if (!board || !board.sections || board.sections.length <= 1) return;
 
     board.sections = board.sections.filter(s => s.id !== sectionId);
+    if (this.activeSectionId === sectionId) this.activeSectionId = board.sections[0]?.id || null;
     board.updatedAt = Date.now();
     this.save();
     this.renderOverview();
@@ -1034,15 +1063,46 @@ export class UIController {
       let startX = 0;
       let startY = 0;
       let isSwiping = false;
+      let holdTimer = null;
+      let holdDrag = false;
+
+      item.draggable = true;
+      item.addEventListener('dragstart', (event) => {
+        event.dataTransfer.setData('text/plain', JSON.stringify({ taskId, sectionId }));
+        event.dataTransfer.effectAllowed = 'move';
+      });
+      item.addEventListener('dragover', (event) => {
+        event.preventDefault();
+        const rect = item.getBoundingClientRect();
+        item.dataset.dropPosition = event.clientY < rect.top + rect.height / 2 ? 'before' : 'after';
+        this.sectionsContainer.querySelectorAll('.task-item').forEach(el => el.classList.remove('drag-target'));
+        item.classList.add('drag-target');
+      });
+      item.addEventListener('dragleave', () => { item.classList.remove('drag-target'); delete item.dataset.dropPosition; });
+      item.addEventListener('drop', (event) => {
+        event.preventDefault();
+        const position = item.dataset.dropPosition || 'before'; item.classList.remove('drag-target');
+        try { const data = JSON.parse(event.dataTransfer.getData('text/plain')); this.moveTask(data.sectionId, data.taskId, sectionId, taskId, position); } catch {}
+      });
 
       item.addEventListener('touchstart', (e) => {
         startX = e.touches[0].clientX;
         startY = e.touches[0].clientY;
         isSwiping = false;
+        holdDrag = false;
         contentWrapper.style.transition = 'none';
+        holdTimer = setTimeout(() => { holdDrag = true; item.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(25); }, 420);
       }, { passive: true });
 
       item.addEventListener('touchmove', (e) => {
+        if (holdTimer && (Math.abs(e.touches[0].clientX - startX) > 12 || Math.abs(e.touches[0].clientY - startY) > 12)) { clearTimeout(holdTimer); holdTimer = null; }
+        if (holdDrag) {
+          e.preventDefault();
+          const target = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY)?.closest('.task-item');
+          this.sectionsContainer.querySelectorAll('.task-item').forEach(el => el.classList.remove('drag-target'));
+          if (target) { target.dataset.dropPosition = e.touches[0].clientY < target.getBoundingClientRect().top + target.offsetHeight / 2 ? 'before' : 'after'; target.classList.add('drag-target'); }
+          return;
+        }
         const diffX = e.touches[0].clientX - startX;
         const diffY = e.touches[0].clientY - startY;
 
@@ -1054,9 +1114,17 @@ export class UIController {
           }
           contentWrapper.style.transform = `translateX(${translateX}px)`;
         }
-      }, { passive: true });
+      }, { passive: false });
 
       item.addEventListener('touchend', (e) => {
+        clearTimeout(holdTimer); holdTimer = null;
+        if (holdDrag) {
+          item.classList.remove('dragging');
+          const target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY)?.closest('.task-item');
+          this.sectionsContainer.querySelectorAll('.task-item').forEach(el => el.classList.remove('drag-target'));
+          if (target && target !== item) this.moveTask(sectionId, taskId, target.dataset.sectionId, target.dataset.taskId, target.dataset.dropPosition || 'before');
+          holdDrag = false; return;
+        }
         if (!isSwiping) return;
         contentWrapper.style.transition = 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1)';
         const diffX = e.changedTouches[0].clientX - startX;
@@ -1078,6 +1146,71 @@ export class UIController {
         });
       }
     });
+
+    this.sectionsContainer.querySelectorAll('.task-section').forEach(sectionEl => {
+      sectionEl.addEventListener('click', (event) => {
+        if (event.target.closest('button, .task-item')) return;
+        this.activeSectionId = sectionEl.dataset.sectionId;
+        this.activeTaskId = null;
+        this.sectionsContainer.querySelectorAll('.task-section').forEach(el => el.classList.toggle('section-selected', el === sectionEl));
+      });
+      sectionEl.draggable = true;
+      sectionEl.addEventListener('dragstart', event => { if (event.target.closest('.task-item')) { event.preventDefault(); return; } event.dataTransfer.setData('application/x-section', sectionEl.dataset.sectionId); event.dataTransfer.effectAllowed = 'move'; });
+      sectionEl.addEventListener('dragover', event => { if (event.dataTransfer.types.includes('application/x-section')) event.preventDefault(); });
+      sectionEl.addEventListener('drop', event => {
+        const fromId = event.dataTransfer.getData('application/x-section'); if (!fromId) return;
+        event.preventDefault(); this.moveSection(fromId, sectionEl.dataset.sectionId);
+      });
+    });
+
+    this.sectionsContainer.querySelectorAll('.task-section').forEach(section => {
+      let timer;
+      section.addEventListener('touchstart', e => {
+        if (e.target.closest('.task-item, input, button')) return;
+        const y = e.touches[0].clientY;
+        timer = setTimeout(() => { section.dataset.holdDrag = 'true'; section.classList.add('dragging'); if (navigator.vibrate) navigator.vibrate(25); }, 420);
+        section.dataset.holdY = y;
+      }, { passive: true });
+      section.addEventListener('touchmove', e => {
+        if (!timer) return;
+        if (Math.abs(e.touches[0].clientY - Number(section.dataset.holdY)) > 12 && section.dataset.holdDrag !== 'true') { clearTimeout(timer); timer = null; }
+        if (section.dataset.holdDrag === 'true') {
+          e.preventDefault();
+          const target = document.elementFromPoint(e.touches[0].clientX, e.touches[0].clientY)?.closest('.task-section');
+          this.sectionsContainer.querySelectorAll('.task-section').forEach(el => el.classList.remove('drag-target'));
+          if (target) { target.dataset.dropPosition = e.touches[0].clientY < target.getBoundingClientRect().top + target.offsetHeight / 2 ? 'before' : 'after'; target.classList.add('drag-target'); }
+        }
+      }, { passive: false });
+      section.addEventListener('touchend', e => {
+        clearTimeout(timer); timer = null;
+        if (section.dataset.holdDrag === 'true') {
+          const target = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY)?.closest('.task-section');
+          if (target && target !== section) this.moveSection(section.dataset.sectionId, target.dataset.sectionId, target.dataset.dropPosition || 'before');
+          delete section.dataset.holdDrag; this.sectionsContainer.querySelectorAll('.task-section').forEach(el => el.classList.remove('dragging', 'drag-target'));
+        }
+      });
+    });
+  }
+
+  moveTask(fromSectionId, taskId, toSectionId, beforeTaskId, position = 'before') {
+    const board = this.getActiveBoard(); if (!board) return;
+    const from = board.sections.find(s => s.id === fromSectionId), to = board.sections.find(s => s.id === toSectionId);
+    const index = from?.tasks?.findIndex(t => t.id === taskId) ?? -1; if (index < 0 || !to) return;
+    this.pushUndoState(); const [task] = from.tasks.splice(index, 1); task.sectionId = to.id;
+    let target = to.tasks.findIndex(t => t.id === beforeTaskId);
+    if (target < 0) target = to.tasks.length;
+    else if (position === 'after') target += 1;
+    if (from === to && target > index) target -= 1;
+    to.tasks.splice(target, 0, task);
+    board.updatedAt = Date.now(); this.save(); this.renderDetail();
+  }
+
+  moveSection(fromId, beforeId, position = 'before') {
+    const board = this.getActiveBoard(); if (!board || fromId === beforeId) return;
+    const from = board.sections.findIndex(s => s.id === fromId), before = board.sections.findIndex(s => s.id === beforeId);
+    if (from < 0 || before < 0) return;
+    this.pushUndoState(); const [section] = board.sections.splice(from, 1); let target = board.sections.findIndex(s => s.id === beforeId); if (position === 'after') target += 1; board.sections.splice(target, 0, section);
+    board.updatedAt = Date.now(); this.save(); this.renderDetail();
   }
 
   // --- Board Actions ---
@@ -1356,6 +1489,14 @@ export class UIController {
       this.closeModal(this.newBoardModal);
       this.openBoard(newBoard.id);
       this.showToast(t('boardCreated'));
+      setTimeout(() => { this.detailTitleInput?.focus(); this.detailTitleInput?.select(); }, 80);
+    });
+
+    document.getElementById('newBoardTitleInput')?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        document.getElementById('btnCreateBoardConfirm')?.click();
+      }
     });
 
     document.getElementById('btnCreateBoardCancel')?.addEventListener('click', () => {
@@ -1368,6 +1509,7 @@ export class UIController {
         this.addTaskAtCursorOrBottom();
       });
     }
+    this.btnCompleteTask?.addEventListener('click', () => this.toggleSelectedTaskCompleted());
 
     if (this.btnAddSection) {
       this.btnAddSection.addEventListener('click', () => {
@@ -1394,6 +1536,7 @@ export class UIController {
         this.crossOutActiveTask();
       });
     }
+    this.btnCompleteTask?.addEventListener('click', () => this.toggleSelectedTaskCompleted());
 
     if (this.btnClearText) {
       this.btnClearText.addEventListener('click', () => {

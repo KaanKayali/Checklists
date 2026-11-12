@@ -221,6 +221,7 @@ input, button, textarea, select {
   display: flex;
   align-items: center;
 }
+.brand-title-wrap .version-badge { align-self: center; transform: translateY(1px); }
 
 .brand-title {
   font-size: 1.55rem;
@@ -568,10 +569,10 @@ input, button, textarea, select {
    Detail View (Board Task Management)
    ========================================================================== */
 .detail-header {
-  height: 64px;
-  min-height: 64px;
+  height: auto;
+  min-height: 122px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 8px 18px 4px 18px;
   background: transparent;
@@ -582,23 +583,31 @@ input, button, textarea, select {
 
 .detail-header-left {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   flex: 1;
   min-width: 0;
 }
 
 .detail-title-container {
+  position: absolute;
+  top: 54px;
+  left: 18px;
+  right: 82px;
   display: flex;
-  align-items: baseline;
-  justify-content: flex-start;
-  gap: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
   min-width: 0;
   flex: 1;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .detail-title-input {
+  display: block;
+  text-align: left;
+  min-height: 1.8em;
   font-size: 1.45rem;
   font-weight: 800;
   color: var(--text-main);
@@ -610,9 +619,14 @@ input, button, textarea, select {
   line-height: 1.25;
   outline: none;
   word-break: break-word;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
   white-space: normal;
+  height: auto;
   transition: border-color 0.15s ease, background-color 0.15s ease;
-  max-width: 60%;
+  width: 100%;
+  max-width: 100%;
+  white-space: normal;
 }
 
 .detail-title-input:hover {
@@ -631,8 +645,21 @@ input, button, textarea, select {
   font-size: 0.72rem;
   color: var(--text-muted);
   line-height: 1.25;
-  white-space: nowrap;
+  white-space: normal;
 }
+.task-item.dragging, .task-section.dragging { opacity: .48; }
+.task-item.drag-target, .task-section.drag-target { position: relative; outline: none; }
+.task-item.drag-target::before, .task-section.drag-target::before, .task-item.drag-target::after, .task-section.drag-target::after { content: ''; position: absolute; left: 0; right: 0; height: 3px; background: #ffc114; z-index: 20; pointer-events: none; }
+.task-item.drag-target::before, .task-section.drag-target::before { top: -4px; display: none; }
+.task-item.drag-target[data-drop-position="before"]::before, .task-section.drag-target[data-drop-position="before"]::before { display: block; }
+.task-item.drag-target::after, .task-section.drag-target::after { bottom: -4px; display: none; }
+.task-item.drag-target[data-drop-position="after"]::after, .task-section.drag-target[data-drop-position="after"]::after { display: block; }
+.task-section.drag-target { outline: none; }
+.toolbar-action-btn:disabled { opacity: .35; cursor: default; }
+.task-item.task-selected { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(255,193,20,.45); }
+.detail-header { position: relative; }
+.task-section { cursor: default; }
+.task-section.section-selected { border-radius: var(--radius-md); background: var(--primary-light); }
 
 .header-actions {
   display: flex;
@@ -849,6 +876,7 @@ input, button, textarea, select {
 .detail-toolbar {
   position: absolute;
   bottom: 0;
+  transition: bottom .12s ease-out;
   left: 0;
   right: 0;
   height: 60px;
@@ -860,6 +888,8 @@ input, button, textarea, select {
   z-index: 15;
   pointer-events: none;
 }
+.toolbar-complete-btn { position: absolute; right: 72px; bottom: 8px; width: 42px; height: 42px; background: var(--bg-card); border-radius: 50%; box-shadow: var(--shadow-md); pointer-events: auto; }
+.toolbar-complete-btn:disabled { opacity: .35; }
 
 .toolbar-left-group {
   display: inline-flex;
