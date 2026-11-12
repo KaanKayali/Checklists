@@ -19,7 +19,6 @@ export const translations = {
     boardMenuLabel: 'Board menu',
     addSectionLabel: 'Add section',
     crossOutLabel: 'Cross out task',
-    clearTextLabel: 'Clear task text',
     addTaskLabel: 'Add task',
     completeTaskLabel: 'Mark task complete',
     reopenTaskLabel: 'Mark task incomplete',
@@ -67,7 +66,6 @@ export const translations = {
     addTask: 'Add task',
     crossOutTask: 'Crossed out',
     uncrossTask: 'Restored',
-    clearText: 'Text cleared',
     
     // Settings Modal
     settings: 'Settings',
@@ -127,7 +125,6 @@ export const translations = {
     boardMenuLabel: 'Board-Menü',
     addSectionLabel: 'Abschnitt hinzufügen',
     crossOutLabel: 'Aufgabe durchstreichen',
-    clearTextLabel: 'Aufgabentext löschen',
     addTaskLabel: 'Aufgabe hinzufügen',
     completeTaskLabel: 'Aufgabe erledigen',
     reopenTaskLabel: 'Aufgabe wieder öffnen',
@@ -175,7 +172,6 @@ export const translations = {
     addTask: 'Aufgabe hinzufügen',
     crossOutTask: 'Durchgestrichen',
     uncrossTask: 'Wiederhergestellt',
-    clearText: 'Text gelöscht',
     
     // Settings Modal
     settings: 'Einstellungen',

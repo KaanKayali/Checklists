@@ -70,8 +70,6 @@ export class UIController {
     this.btnAddTask = document.getElementById('btnAddTask');
     this.btnAddSection = document.getElementById('btnAddSection');
     this.btnCrossOut = document.getElementById('btnCrossOut');
-    this.btnClearText = document.getElementById('btnClearText');
-    this.btnCompleteTask = document.getElementById('btnCompleteTask');
     this.btnEditTask = document.getElementById('btnEditTask');
     this.selectedTaskId = null;
     this.selectedTaskSectionId = null;
@@ -90,6 +88,7 @@ export class UIController {
   init() {
     this.applyTheme(this.state.settings.theme);
     setLanguage(this.state.settings.language);
+    this.cleanUpEmptyTasks();
 
     this.bindEvents();
     this.renderOverview();
@@ -416,17 +415,15 @@ export class UIController {
 
   // --- Automatic Cleanup of Empty Tasks ---
   cleanUpEmptyTasks() {
-    if (window.innerWidth < 860) return;
-    const board = this.getActiveBoard();
-    if (!board || !board.sections) return;
-
     let modified = false;
-    for (const sec of board.sections) {
-      if (sec.tasks) {
-        const originalCount = sec.tasks.length;
-        sec.tasks = sec.tasks.filter(t => t.text !== undefined && t.text.trim() !== '');
-        if (sec.tasks.length !== originalCount) {
-          modified = true;
+    for (const board of this.state.boards || []) {
+      for (const section of board.sections || []) {
+        if (section.tasks) {
+          const originalCount = section.tasks.length;
+          section.tasks = section.tasks.filter(task => typeof task.text === 'string' && task.text.trim() !== '');
+          if (section.tasks.length !== originalCount) {
+            modified = true;
+          }
         }
       }
     }
@@ -753,6 +750,14 @@ export class UIController {
         if (window.innerWidth < 860 && input.readOnly) event.preventDefault();
       });
 
+      input.addEventListener('blur', () => {
+        if (input.value.trim() === '') {
+          if (this.editingTaskId === taskId) this.editingTaskId = null;
+          if (this.selectedTaskId === taskId) this.clearTaskSelection();
+          this.deleteTask(sectionId, taskId, false);
+        }
+      });
+
       // Text input change
       input.addEventListener('input', () => {
         autoResize();
@@ -833,13 +838,7 @@ export class UIController {
     this.activeTaskId = taskId;
     this.activeSectionId = sectionId;
     this.sectionsContainer?.querySelectorAll('.task-item').forEach(item => item.classList.toggle('task-selected', item.dataset.taskId === taskId));
-    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask, this.btnEditTask].forEach(button => { if (button) button.disabled = !taskId; });
-    const task = this.getActiveBoard()?.sections?.find(section => section.id === sectionId)?.tasks?.find(item => item.id === taskId);
-    if (task && this.btnCompleteTask) {
-      const label = t(task.completed ? 'reopenTaskLabel' : 'completeTaskLabel');
-      this.btnCompleteTask.title = label;
-      this.btnCompleteTask.setAttribute('aria-label', label);
-    }
+    [this.btnCrossOut, this.btnEditTask].forEach(button => { if (button) button.disabled = !taskId; });
   }
 
   clearTaskSelection() {
@@ -854,7 +853,7 @@ export class UIController {
     this.activeTaskId = null;
     this.activeSectionId = null;
     this.sectionsContainer?.querySelectorAll('.task-item').forEach(item => item.classList.remove('task-selected'));
-    [this.btnCrossOut, this.btnClearText, this.btnCompleteTask, this.btnEditTask].forEach(button => { if (button) button.disabled = true; });
+    [this.btnCrossOut, this.btnEditTask].forEach(button => { if (button) button.disabled = true; });
     this.btnEditTask?.setAttribute('aria-label', t('editTaskLabel'));
     if (this.btnEditTask) this.btnEditTask.title = t('editTaskLabel');
   }
@@ -897,12 +896,9 @@ export class UIController {
     task.completed = !task.completed;
     board.updatedAt = Date.now();
     this.save();
+    this.clearTaskSelection();
     this.renderOverview();
     this.renderDetail();
-  }
-
-  toggleSelectedTaskCompleted() {
-    if (this.selectedTaskId) this.toggleTaskCompleted(this.selectedTaskSectionId, this.selectedTaskId);
   }
 
   crossOutActiveTask() {
@@ -931,32 +927,6 @@ export class UIController {
       this.save();
       this.renderDetail();
       this.showToast(targetTask.crossedOut ? t('crossOutTask') : t('uncrossTask'));
-    }
-  }
-
-  clearActiveTaskText() {
-    if (!this.selectedTaskId) return;
-    this.pushUndoState();
-    const board = this.getActiveBoard();
-    if (!board || !board.sections || !this.selectedTaskId) return;
-
-    for (const sec of board.sections) {
-      if (sec.tasks) {
-        const task = sec.tasks.find(t => t.id === this.selectedTaskId);
-        if (task) {
-          task.text = '';
-          board.updatedAt = Date.now();
-          this.save();
-          this.renderDetail();
-          
-          setTimeout(() => {
-            const input = this.sectionsContainer.querySelector(`.task-input[data-task-id="${task.id}"]`);
-            if (input) input.focus();
-          }, 50);
-          this.showToast(t('clearText'));
-          break;
-        }
-      }
     }
   }
 
@@ -1608,8 +1578,6 @@ export class UIController {
       });
     }
     this.btnEditTask?.addEventListener('click', () => this.editSelectedTask());
-    this.btnCompleteTask?.addEventListener('click', () => this.toggleSelectedTaskCompleted());
-
     if (this.btnAddSection) {
       this.btnAddSection.addEventListener('click', () => {
         const input = document.getElementById('newSectionTitleInput');
@@ -1635,12 +1603,6 @@ export class UIController {
         this.crossOutActiveTask();
       });
     }
-    if (this.btnClearText) {
-      this.btnClearText.addEventListener('click', () => {
-        this.clearActiveTaskText();
-      });
-    }
-
     // Settings Modal Events
     this.bindSettingsEvents();
 

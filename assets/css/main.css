@@ -677,13 +677,16 @@ input, button, textarea, select {
 
 /* Section styling: text input stretches 100% to right, line between sections */
 .task-section {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px 24px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background-color: var(--bg-card);
+  box-shadow: var(--shadow-sm);
 }
 
 .task-section + .task-section {
-  margin-top: 24px;
-  padding-top: 18px;
-  border-top: 1px solid var(--border-color);
+  margin-top: 16px;
 }
 
 .task-section-header {
@@ -787,13 +790,14 @@ input, button, textarea, select {
   transition: background-color 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275), border-color 0.2s ease, transform 0.15s ease;
 }
 
-.custom-checkbox:hover::before {
-  border-color: var(--primary);
-  transform: scale(1.05);
-}
-
 .custom-checkbox:active::before {
   transform: scale(0.92);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .custom-checkbox:hover::before {
+    transform: scale(1.05);
+  }
 }
 
 .custom-checkbox svg {
@@ -924,33 +928,6 @@ input, button, textarea, select {
   pointer-events: auto;
 }
 
-.toolbar-complete-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--bg-card);
-  box-shadow: var(--shadow-md);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
-}
-
-.toolbar-complete-btn:hover:not(:disabled) {
-  transform: scale(1.06);
-}
-
-.toolbar-complete-btn:active:not(:disabled) {
-  transform: scale(0.92);
-}
-.toolbar-complete-btn:disabled { opacity: .35; }
-.toolbar-edit-btn {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
 .toolbar-edit-btn:disabled { opacity: .35; }
 
 .toolbar-left-group {
@@ -1051,10 +1028,6 @@ input, button, textarea, select {
     height: 44px;
   }
 
-  .toolbar-complete-btn {
-    width: 38px;
-    height: 38px;
-  }
 }
 
 /* ==========================================================================
