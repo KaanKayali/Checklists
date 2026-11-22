@@ -1,6 +1,6 @@
 {
   "name": "checklists-webapp",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Production-ready, highly polished Checklists Web Application & PWA for iPhone and Desktop",
   "main": "index.html",
   "scripts": {

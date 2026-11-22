@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.1.0] - 2026-11-22
+- Added Firebase email/password accounts, password reset, and persistent login sessions.
+- Added per-account Firestore board synchronization with live updates and offline persistence.
+- Kept account-specific local backups and added one-time import of existing local boards.
+- Added Firestore security rules and Firebase setup instructions.
+
 ## [1.0.1] - 2026-11-10
 - Refined UI matching the wireframe and reference layout.
 - App identity: Checklists with "Boards" structure and zero sample data initial state.

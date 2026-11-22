@@ -4,11 +4,30 @@
  */
 
 import { t, getLanguage, setLanguage, formatFullDate, formatTime, formatBoardTimestamp } from './i18n.js';
-import { generateId, saveData, exportDataToFile, parseImportJSON, mergeImportData, clearAllStorage, getDefaultState } from './storage.js';
+import {
+  generateId,
+  saveData,
+  exportDataToFile,
+  parseImportJSON,
+  mergeImportData,
+  clearAllStorage,
+  getDefaultState,
+  getAccountStorageKey,
+  getMigrationStorageKey,
+  hasStoredData,
+  loadData
+} from './storage.js';
 
 export class UIController {
   constructor(state) {
     this.state = state;
+    this.migrationSource = null;
+    this.currentUid = null;
+    this.pendingLegacyFallback = false;
+    this.user = null;
+    this.firebase = null;
+    this.unsubscribeBoards = null;
+    this.applyingCloudSnapshot = false;
     if (!this.state.boards) {
       this.state.boards = this.state.checklists || [];
     }
@@ -82,8 +101,11 @@ export class UIController {
     this.newSectionModal = document.getElementById('newSectionModal');
     this.confirmModal = document.getElementById('confirmModal');
     this.toastEl = document.getElementById('toast');
+    this.syncStatusEl = document.getElementById('syncStatus');
 
     this.init();
+    this.updateAccountUI();
+    this.updateSyncStatus('local');
   }
 
   init() {
@@ -145,7 +167,248 @@ export class UIController {
   }
 
   save() {
-    saveData(this.state);
+    const storageKey = this.currentUid ? getAccountStorageKey(this.currentUid) : undefined;
+    saveData(this.state, storageKey);
+    if (!this.currentUid) {
+      return;
+    }
+
+    if (this.pendingLegacyFallback) {
+      if (!this.applyingCloudSnapshot) {
+        this.migrationSource = JSON.parse(JSON.stringify(this.state));
+      }
+      return;
+    }
+
+    if (this.firebase && !this.applyingCloudSnapshot) {
+      this.updateSyncStatus(navigator.onLine ? 'working' : 'offline');
+      this.firebase.syncBoards(this.currentUid, this.state.boards).then(() => {
+        if (navigator.onLine) this.updateSyncStatus('done');
+      }).catch((error) => {
+        console.error('Failed to sync boards with Firestore:', error);
+        this.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+      });
+    }
+  }
+
+  setFirebase(firebase) {
+    this.firebase = firebase;
+    this.updateAccountUI();
+  }
+
+  setFirebaseUnavailable(message) {
+    this.firebase = null;
+    this.updateAccountUI(message);
+    this.updateSyncStatus('local');
+  }
+
+  async handleAuthState(user) {
+    const nextUid = user ? user.uid : null;
+    if (nextUid === this.currentUid) {
+      this.user = user;
+      this.updateAccountUI();
+      return;
+    }
+
+    if (this.unsubscribeBoards) {
+      this.unsubscribeBoards();
+      this.unsubscribeBoards = null;
+    }
+
+    if (nextUid) {
+      this.migrationSource = JSON.parse(JSON.stringify(this.currentUid ? loadData() : this.state));
+    }
+
+    this.currentUid = nextUid;
+    this.user = user;
+    this.undoStack = [];
+
+    if (nextUid) {
+      const accountKey = getAccountStorageKey(nextUid);
+      const hasAccountBackup = hasStoredData(accountKey);
+      this.pendingLegacyFallback = !hasAccountBackup;
+      this.state = hasAccountBackup
+        ? loadData(accountKey)
+        : JSON.parse(JSON.stringify(this.migrationSource || getDefaultState()));
+      saveData(this.state, accountKey);
+      this.refreshStateView();
+      this.unsubscribeBoards = this.firebase.watchBoards(
+        nextUid,
+        (boards, metadata) => this.applyCloudSnapshot(nextUid, boards, metadata),
+        (error) => {
+          console.error('Failed to read boards from Firestore:', error);
+          this.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+        }
+      );
+    } else {
+      this.state = loadData();
+      this.migrationSource = null;
+      this.pendingLegacyFallback = false;
+      this.refreshStateView();
+    }
+
+    this.updateAccountUI();
+    this.updateSyncStatus(nextUid ? 'working' : 'local');
+  }
+
+  applyCloudSnapshot(uid, cloudBoards, metadata) {
+    if (uid !== this.currentUid) return;
+
+    const fromCache = metadata.fromCache;
+    const localBoards = new Map(this.state.boards.map((board) => [board.id, board]));
+    const mergedBoards = fromCache ? new Map(localBoards) : new Map();
+
+    for (const cloudBoard of cloudBoards) {
+      const localBoard = localBoards.get(cloudBoard.id);
+      const localIsNewer = localBoard &&
+        (Number(localBoard.updatedAt) || 0) > (Number(cloudBoard.updatedAt) || 0);
+      mergedBoards.set(cloudBoard.id, localIsNewer ? localBoard : cloudBoard);
+    }
+
+    if (!fromCache) {
+      this.offerLocalMigration(uid, mergedBoards);
+      this.pendingLegacyFallback = false;
+    }
+
+    this.state.boards = Array.from(mergedBoards.values());
+    if (!this.state.boards.some((board) => board.id === this.state.activeBoardId)) {
+      this.state.activeBoardId = this.state.boards[0]?.id || null;
+    }
+
+    this.applyingCloudSnapshot = true;
+    this.refreshStateView();
+    this.save();
+    this.applyingCloudSnapshot = false;
+
+    if (!this.pendingLegacyFallback) {
+      this.firebase.syncBoards(uid, this.state.boards).then(() => {
+        if (navigator.onLine && !metadata.hasPendingWrites) this.updateSyncStatus('done');
+      }).catch((error) => {
+        console.error('Failed to sync boards with Firestore:', error);
+        this.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+      });
+    }
+
+    if (!navigator.onLine) {
+      this.updateSyncStatus('offline');
+    } else if (fromCache || metadata.hasPendingWrites) {
+      this.updateSyncStatus('working');
+    } else {
+      this.updateSyncStatus('done');
+    }
+  }
+
+  offerLocalMigration(uid, mergedBoards) {
+    const migrationKey = getMigrationStorageKey(uid);
+    if (localStorage.getItem(migrationKey) === 'done') return;
+
+    const localBoards = this.migrationSource?.boards || [];
+    if (localBoards.length > 0) {
+      const accepted = window.confirm(t('importLocalBoardsPrompt', localBoards.length));
+      if (accepted) {
+        for (const board of localBoards) {
+          if (!mergedBoards.has(board.id)) mergedBoards.set(board.id, board);
+        }
+      }
+    }
+    localStorage.setItem(migrationKey, 'done');
+  }
+
+  refreshStateView() {
+    this.applyTheme(this.state.settings.theme);
+    setLanguage(this.state.settings.language);
+    this.renderOverview();
+    if (this.state.activeBoardId && this.getBoard(this.state.activeBoardId)) {
+      this.renderDetail();
+    } else if (window.innerWidth >= 860 && this.state.boards.length > 0) {
+      this.state.activeBoardId = this.state.boards[0].id;
+      this.renderDetail();
+    } else {
+      this.state.activeBoardId = null;
+      this.renderDetail();
+    }
+    this.restoreScrollPositions();
+    this.updateStaticTranslations();
+    this.updateSortUI();
+    this.updateUndoButtonState();
+  }
+
+  updateAccountUI(message) {
+    const signedIn = document.getElementById('accountSignedIn');
+    const signedOut = document.getElementById('accountSignedOut');
+    const email = document.getElementById('accountEmail');
+    const warning = document.getElementById('authConfigWarning');
+    const authMessage = document.getElementById('authMessage');
+    const isSignedIn = Boolean(this.user);
+
+    if (signedIn) signedIn.hidden = !isSignedIn;
+    if (signedOut) signedOut.hidden = isSignedIn;
+    if (email) email.textContent = this.user?.email || '';
+    if (warning) {
+      warning.hidden = Boolean(this.firebase);
+      if (message) warning.textContent = message;
+    }
+    ['btnLogin', 'btnRegister', 'btnPasswordReset', 'btnLogout'].forEach((id) => {
+      const button = document.getElementById(id);
+      if (button) button.disabled = !this.firebase;
+    });
+    if (authMessage && message) authMessage.textContent = '';
+  }
+
+  updateSyncStatus(status) {
+    if (!this.syncStatusEl) return;
+    const keyByStatus = {
+      local: 'syncLocal',
+      working: 'syncWorking',
+      done: 'syncDone',
+      offline: 'syncOffline',
+      error: 'syncError'
+    };
+    const currentStatus = !navigator.onLine && this.currentUid ? 'offline' : status;
+    this.syncStatusEl.textContent = t(keyByStatus[currentStatus] || 'syncLocal');
+    this.syncStatusEl.dataset.status = currentStatus;
+  }
+
+  authErrorMessage(error) {
+    const code = error?.code || '';
+    const keys = {
+      'auth/invalid-email': 'authInvalidEmail',
+      'auth/email-already-in-use': 'authEmailInUse',
+      'auth/weak-password': 'authWeakPassword',
+      'auth/wrong-password': 'authWrongPassword',
+      'auth/user-not-found': 'authWrongPassword',
+      'auth/invalid-credential': 'authWrongPassword',
+      'auth/network-request-failed': 'authNetworkError',
+      'auth/too-many-requests': 'authTooManyRequests',
+      'auth/operation-not-allowed': 'authNotEnabled'
+    };
+    return t(keys[code] || 'authGenericError');
+  }
+
+  async performAuthAction(action) {
+    const email = document.getElementById('authEmail')?.value.trim();
+    const password = document.getElementById('authPassword')?.value || '';
+    const message = document.getElementById('authMessage');
+    if (!this.firebase) {
+      if (message) message.textContent = t('authConfigMissing');
+      return;
+    }
+
+    try {
+      if (action === 'login') await this.firebase.loginWithEmail(email, password);
+      if (action === 'register') await this.firebase.registerWithEmail(email, password);
+      if (action === 'reset') {
+        if (!email) {
+          if (message) message.textContent = t('authInvalidEmail');
+          return;
+        }
+        await this.firebase.resetPassword(email);
+        if (message) message.textContent = t('authResetSent');
+      }
+    } catch (error) {
+      console.error('Firebase authentication failed:', error);
+      if (message) message.textContent = this.authErrorMessage(error);
+    }
   }
 
   getActiveBoard() {
@@ -1835,6 +2098,18 @@ export class UIController {
       this.saveScrollPosition();
     });
 
+    window.addEventListener('online', () => {
+      if (!this.currentUid) return;
+      this.updateSyncStatus('working');
+      this.firebase?.syncBoards(this.currentUid, this.state.boards).catch((error) => {
+        console.error('Failed to sync boards after reconnecting:', error);
+        this.updateSyncStatus('error');
+      });
+    });
+    window.addEventListener('offline', () => {
+      if (this.currentUid) this.updateSyncStatus('offline');
+    });
+
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         if (this.state.settings.theme === 'system') {
@@ -1848,6 +2123,7 @@ export class UIController {
   populateSettingsForm() {
     const langSelect = document.getElementById('settingLanguage');
     if (langSelect) langSelect.value = this.state.settings.language || 'en';
+    this.updateAccountUI();
   }
 
   bindSettingsEvents() {
@@ -1857,6 +2133,25 @@ export class UIController {
     const btnImport = document.getElementById('btnImportData');
     const importFileInput = document.getElementById('importFileInput');
     const btnResetAll = document.getElementById('btnResetAllData');
+
+    document.getElementById('btnLogin')?.addEventListener('click', () => {
+      this.performAuthAction('login');
+    });
+    document.getElementById('btnRegister')?.addEventListener('click', () => {
+      this.performAuthAction('register');
+    });
+    document.getElementById('btnPasswordReset')?.addEventListener('click', () => {
+      this.performAuthAction('reset');
+    });
+    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+      try {
+        await this.firebase.logout();
+      } catch (error) {
+        console.error('Firebase sign-out failed:', error);
+        const message = document.getElementById('authMessage');
+        if (message) message.textContent = this.authErrorMessage(error);
+      }
+    });
 
     langSelect?.addEventListener('change', () => {
       const newLang = langSelect.value;
@@ -1897,8 +2192,10 @@ export class UIController {
 
         const shouldReplace = window.confirm(`${t('importReplaceOrMerge')}\n\nOK: ${t('importMerge')}\nCancel: ${t('importReplace')}`);
         this.state = mergeImportData(this.state, parsed, !shouldReplace);
+        this.undoStack = [];
+        this.cleanUpEmptyTasks();
         this.save();
-        this.init();
+        this.refreshStateView();
         this.closeModal(this.settingsModal);
         this.showToast(t('importSuccess'));
       };
@@ -1912,10 +2209,10 @@ export class UIController {
         t('confirmResetData'),
         t('resetData'),
         () => {
-          clearAllStorage();
+          clearAllStorage(this.currentUid ? getAccountStorageKey(this.currentUid) : undefined);
           this.state = getDefaultState();
-          this.save();
-          this.init();
+          this.undoStack = [];
+          this.refreshStateView();
           this.closeModal(this.settingsModal);
           this.showToast(t('resetSuccess'));
         }

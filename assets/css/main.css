@@ -1395,3 +1395,64 @@ input, button, textarea, select {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
+
+.sync-status {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  min-height: 1em;
+}
+
+.sync-status[data-status="offline"],
+.sync-status[data-status="error"] {
+  color: var(--danger);
+}
+
+.account-settings {
+  gap: 8px;
+}
+
+.account-email-line {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.auth-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.auth-actions .btn {
+  flex: 1;
+}
+
+.auth-reset-link {
+  align-self: flex-start;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.85rem;
+}
+
+.auth-message,
+.auth-config-warning {
+  margin: 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.auth-message:empty {
+  display: none;
+}
+
+.account-settings button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

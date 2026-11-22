@@ -32,7 +32,7 @@
             <img class="brand-logo" src="assets/icons/brand-logo.png" alt="" aria-hidden="true">
             <div class="brand-title-wrap">
               <span class="brand-title" id="brandTitle">Checklists</span>
-              <span class="version-badge">v1.0.0</span>
+              <span class="version-badge">v1.1.0</span>
             </div>
           </div>
           <div class="header-actions">
@@ -154,6 +154,7 @@
 
         <!-- Master Content List -->
         <div class="master-content">
+          <div class="sync-status" id="syncStatus" role="status" aria-live="polite"></div>
           <!-- Board Counter underneath header, above lists -->
           <div class="board-counter-label" id="boardCounter">0 Boards</div>
 
@@ -348,6 +349,29 @@
         <h3 class="modal-title" data-i18n="settings">Settings</h3>
       </div>
       <div class="modal-body">
+        <div class="form-group account-settings">
+          <label class="form-label" data-i18n="account">Account</label>
+          <p class="auth-config-warning" id="authConfigWarning" data-i18n="authConfigMissing" hidden></p>
+          <div id="accountSignedIn" hidden>
+            <p class="account-email-line"><span data-i18n="signedInAs">Signed in as</span>: <strong id="accountEmail"></strong></p>
+            <button type="button" class="btn btn-secondary" id="btnLogout" data-i18n="authLogout">Log out</button>
+          </div>
+          <div id="accountSignedOut">
+            <label class="form-label" for="authEmail" data-i18n="authEmail">Email address</label>
+            <input type="email" class="form-input" id="authEmail" autocomplete="email" required>
+            <label class="form-label" for="authPassword" data-i18n="authPassword">Password</label>
+            <input type="password" class="form-input" id="authPassword" autocomplete="current-password" minlength="6" required>
+            <div class="auth-actions">
+              <button type="button" class="btn btn-primary" id="btnLogin" data-i18n="authLogin">Log in</button>
+              <button type="button" class="btn btn-secondary" id="btnRegister" data-i18n="authRegister">Create account</button>
+            </div>
+            <button type="button" class="auth-reset-link" id="btnPasswordReset" data-i18n="authResetPassword">Forgot password?</button>
+          </div>
+          <p class="auth-message" id="authMessage" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="menu-divider" style="margin: 8px 0;"></div>
+
         <!-- Language -->
         <div class="form-group">
           <label class="form-label" data-i18n="language">Language</label>

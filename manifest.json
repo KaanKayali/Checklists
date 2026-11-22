@@ -1,7 +1,7 @@
 {
   "name": "Checklists",
   "short_name": "Checklists",
-  "description": "Clean, modern, offline-ready Checklists & Boards web application & PWA",
+  "description": "Offline-ready Checklists & Boards with Firebase account sync",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
