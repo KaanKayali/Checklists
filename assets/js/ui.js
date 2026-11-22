@@ -18,6 +18,16 @@ import {
   loadData
 } from './storage.js';
 
+function stableSerialize(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export class UIController {
   constructor(state) {
     this.state = state;
@@ -32,6 +42,7 @@ export class UIController {
     if (!this.state.boards) {
       this.state.boards = this.state.checklists || [];
     }
+
     this.activeTaskId = null; // Currently focused task ID for cursor logic
     this.activeSectionId = null;
     this.undoStack = [];
@@ -266,13 +277,18 @@ export class UIController {
     if (uid !== this.currentUid) return;
 
     const fromCache = metadata.fromCache;
-    const localBoards = new Map(this.state.boards.map((board) => [board.id, board]));
+    const localBoardList = this.state.boards;
+    const localBoards = new Map(localBoardList.map((board) => [board.id, board]));
     const mergedBoards = fromCache ? new Map(localBoards) : new Map();
 
     for (const cloudBoard of cloudBoards) {
       const localBoard = localBoards.get(cloudBoard.id);
-      const localIsNewer = localBoard &&
-        (Number(localBoard.updatedAt) || 0) > (Number(cloudBoard.updatedAt) || 0);
+      const localUpdatedAt = Number(localBoard?.updatedAt) || 0;
+      const cloudUpdatedAt = Number(cloudBoard.updatedAt) || 0;
+      const localIsNewer = localBoard && (
+        localUpdatedAt > cloudUpdatedAt ||
+        (metadata.hasPendingWrites && localUpdatedAt >= cloudUpdatedAt)
+      );
       mergedBoards.set(cloudBoard.id, localIsNewer ? localBoard : cloudBoard);
     }
 
@@ -281,15 +297,30 @@ export class UIController {
       this.pendingLegacyFallback = false;
     }
 
-    this.state.boards = Array.from(mergedBoards.values());
+    const mergedBoardList = localBoardList
+      .filter((board) => mergedBoards.has(board.id))
+      .map((board) => mergedBoards.get(board.id));
+    for (const cloudBoard of cloudBoards) {
+      if (!localBoards.has(cloudBoard.id)) {
+        mergedBoardList.push(mergedBoards.get(cloudBoard.id));
+      }
+    }
+
+    const boardsChanged = stableSerialize(localBoardList) !== stableSerialize(mergedBoardList);
+    this.state.boards = mergedBoardList;
     if (!this.state.boards.some((board) => board.id === this.state.activeBoardId)) {
       this.state.activeBoardId = this.state.boards[0]?.id || null;
     }
 
-    this.applyingCloudSnapshot = true;
-    this.refreshStateView();
-    this.save();
-    this.applyingCloudSnapshot = false;
+    if (boardsChanged) {
+      this.applyingCloudSnapshot = true;
+      try {
+        this.refreshStateView();
+        this.save();
+      } finally {
+        this.applyingCloudSnapshot = false;
+      }
+    }
 
     if (!this.pendingLegacyFallback) {
       this.firebase.syncBoards(uid, this.state.boards).then(() => {
