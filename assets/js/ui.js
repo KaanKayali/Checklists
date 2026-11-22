@@ -24,6 +24,7 @@ export class UIController {
     this.migrationSource = null;
     this.currentUid = null;
     this.pendingLegacyFallback = false;
+    this.authReady = false;
     this.user = null;
     this.firebase = null;
     this.unsubscribeBoards = null;
@@ -198,14 +199,23 @@ export class UIController {
 
   setFirebaseUnavailable(message) {
     this.firebase = null;
+    this.authReady = true;
     this.updateAccountUI(message);
     this.updateSyncStatus('local');
+  }
+
+  reportAuthStateError(message) {
+    this.authReady = true;
+    const authMessage = document.getElementById('authMessage');
+    if (authMessage) authMessage.textContent = message;
+    this.updateAccountUI();
   }
 
   async handleAuthState(user) {
     const nextUid = user ? user.uid : null;
     if (nextUid === this.currentUid) {
       this.user = user;
+      this.authReady = true;
       this.updateAccountUI();
       return;
     }
@@ -247,6 +257,7 @@ export class UIController {
       this.refreshStateView();
     }
 
+    this.authReady = true;
     this.updateAccountUI();
     this.updateSyncStatus(nextUid ? 'working' : 'local');
   }
@@ -334,24 +345,31 @@ export class UIController {
   }
 
   updateAccountUI(message) {
+    const authGate = document.getElementById('authGate');
+    const authGateForm = document.getElementById('authGateForm');
+    const authLoading = document.getElementById('authLoading');
+    const authMessage = document.getElementById('authMessage');
     const signedIn = document.getElementById('accountSignedIn');
-    const signedOut = document.getElementById('accountSignedOut');
     const email = document.getElementById('accountEmail');
     const warning = document.getElementById('authConfigWarning');
-    const authMessage = document.getElementById('authMessage');
     const isSignedIn = Boolean(this.user);
 
+    if (authGate) authGate.hidden = isSignedIn && this.authReady;
+    if (authGateForm) authGateForm.hidden = !this.authReady || isSignedIn;
+    if (authLoading) authLoading.hidden = this.authReady;
+    if (this.viewContainer) this.viewContainer.hidden = !isSignedIn || !this.authReady;
     if (signedIn) signedIn.hidden = !isSignedIn;
-    if (signedOut) signedOut.hidden = isSignedIn;
     if (email) email.textContent = this.user?.email || '';
     if (warning) {
-      warning.hidden = Boolean(this.firebase);
+      warning.hidden = Boolean(this.firebase) || !this.authReady;
       if (message) warning.textContent = message;
     }
-    ['btnLogin', 'btnRegister', 'btnPasswordReset', 'btnLogout'].forEach((id) => {
+    ['btnLogin', 'btnRegister', 'btnGoogleLogin', 'btnPasswordReset'].forEach((id) => {
       const button = document.getElementById(id);
-      if (button) button.disabled = !this.firebase;
+      if (button) button.disabled = !this.firebase || !this.authReady;
     });
+    const logoutButton = document.getElementById('btnLogout');
+    if (logoutButton) logoutButton.disabled = !this.firebase || !isSignedIn;
     if (authMessage && message) authMessage.textContent = '';
   }
 
@@ -380,7 +398,11 @@ export class UIController {
       'auth/invalid-credential': 'authWrongPassword',
       'auth/network-request-failed': 'authNetworkError',
       'auth/too-many-requests': 'authTooManyRequests',
-      'auth/operation-not-allowed': 'authNotEnabled'
+      'auth/operation-not-allowed': 'authNotEnabled',
+      'auth/popup-closed-by-user': 'authGooglePopupClosed',
+      'auth/popup-blocked': 'authGooglePopupBlocked',
+      'auth/account-exists-with-different-credential': 'authAccountExists',
+      'auth/unauthorized-domain': 'authUnauthorizedDomain'
     };
     return t(keys[code] || 'authGenericError');
   }
@@ -397,6 +419,7 @@ export class UIController {
     try {
       if (action === 'login') await this.firebase.loginWithEmail(email, password);
       if (action === 'register') await this.firebase.registerWithEmail(email, password);
+      if (action === 'google') await this.firebase.loginWithGoogle();
       if (action === 'reset') {
         if (!email) {
           if (message) message.textContent = t('authInvalidEmail');
@@ -2134,11 +2157,15 @@ export class UIController {
     const importFileInput = document.getElementById('importFileInput');
     const btnResetAll = document.getElementById('btnResetAllData');
 
-    document.getElementById('btnLogin')?.addEventListener('click', () => {
+    document.getElementById('authForm')?.addEventListener('submit', (event) => {
+      event.preventDefault();
       this.performAuthAction('login');
     });
     document.getElementById('btnRegister')?.addEventListener('click', () => {
       this.performAuthAction('register');
+    });
+    document.getElementById('btnGoogleLogin')?.addEventListener('click', () => {
+      this.performAuthAction('google');
     });
     document.getElementById('btnPasswordReset')?.addEventListener('click', () => {
       this.performAuthAction('reset');
@@ -2148,8 +2175,7 @@ export class UIController {
         await this.firebase.logout();
       } catch (error) {
         console.error('Firebase sign-out failed:', error);
-        const message = document.getElementById('authMessage');
-        if (message) message.textContent = this.authErrorMessage(error);
+        this.showToast(this.authErrorMessage(error));
       }
     });
 

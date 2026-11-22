@@ -1,4 +1,4 @@
-const CACHE_NAME = 'checklists-v1.1.0';
+const CACHE_NAME = 'checklists-v1.1.0-auth';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

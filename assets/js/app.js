@@ -23,11 +23,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         (user) => {
           ui.handleAuthState(user).catch((error) => {
             console.error('Failed to initialize the signed-in account:', error);
+            ui.reportAuthStateError(t('authGenericError'));
             ui.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
           });
         },
         (error) => {
           console.error('Firebase authentication state failed:', error);
+          ui.reportAuthStateError(t('authGenericError'));
           ui.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
         }
       );

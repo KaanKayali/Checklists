@@ -2,6 +2,7 @@
 
 ## [1.1.0] - 2026-11-22
 - Added Firebase email/password accounts, password reset, and persistent login sessions.
+- Added a sign-in-required start page and Google sign-in.
 - Added per-account Firestore board synchronization with live updates and offline persistence.
 - Kept account-specific local backups and added one-time import of existing local boards.
 - Added Firestore security rules and Firebase setup instructions.

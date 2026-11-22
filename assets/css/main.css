@@ -1456,3 +1456,115 @@ input, button, textarea, select {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.view-container[hidden],
+.auth-gate[hidden],
+#authGateForm[hidden],
+#authLoading[hidden] {
+  display: none !important;
+}
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: grid;
+  place-items: center;
+  overflow-y: auto;
+  padding: max(24px, var(--sat)) max(20px, var(--sar)) max(24px, var(--sab)) max(20px, var(--sal));
+  background:
+    radial-gradient(circle at 50% 0%, rgba(var(--primary-rgb), 0.14), transparent 42%),
+    var(--bg-app);
+}
+
+.auth-card {
+  width: min(100%, 430px);
+  padding: clamp(24px, 6vw, 38px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  background-color: var(--bg-card);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 30px;
+}
+
+.auth-gate-title {
+  margin-bottom: 6px;
+  color: var(--text-main);
+  font-size: 1.65rem;
+  line-height: 1.2;
+}
+
+.auth-gate-subtitle {
+  margin-bottom: 24px;
+  color: var(--text-muted);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.auth-form .form-input {
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.auth-form .auth-actions {
+  margin-top: 6px;
+}
+
+.auth-form .btn,
+.auth-google-btn {
+  min-height: 44px;
+}
+
+.auth-google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 9px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-main);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.auth-google-btn:hover {
+  background: var(--bg-card-subtle);
+}
+
+.auth-google-mark {
+  color: #4285f4;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.auth-gate .auth-reset-link {
+  margin-top: 12px;
+}
+
+.auth-gate .auth-message,
+.auth-gate .auth-config-warning {
+  margin-top: 12px;
+}
+
+.auth-loading {
+  color: var(--text-muted);
+}
+
+.auth-gate button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

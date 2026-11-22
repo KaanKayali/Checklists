@@ -55,7 +55,7 @@ I mainly made this app for myself: a straightforward place to organize everyday 
 
 #### Data and offline use
 - **Offline-ready:** Boards are cached by Firestore and continue to work offline after they have been loaded.
-- **Cloud sync:** Sign in with an email and password to sync your boards between devices.
+- **Cloud sync:** Sign in with email/password or Google to sync your boards between devices. An account is required to use the app.
 - **Local backup:** Boards are also kept in browser storage; existing local boards can be imported into an account.
 - **JSON import and export:** Back up or move your checklist data.
 
