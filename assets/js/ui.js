@@ -373,6 +373,7 @@ export class UIController {
     this.updateStaticTranslations();
     this.updateSortUI();
     this.updateUndoButtonState();
+    requestAnimationFrame(() => this.resizeAllTaskInputs());
   }
 
   updateAccountUI(message) {
@@ -389,6 +390,11 @@ export class UIController {
     if (authGateForm) authGateForm.hidden = !this.authReady || isSignedIn;
     if (authLoading) authLoading.hidden = this.authReady;
     if (this.viewContainer) this.viewContainer.hidden = !isSignedIn || !this.authReady;
+    if (isSignedIn && this.authReady) {
+      requestAnimationFrame(() => {
+        this.resizeAllTaskInputs();
+      });
+    }
     if (signedIn) signedIn.hidden = !isSignedIn;
     if (email) email.textContent = this.user?.email || '';
     if (warning) {
@@ -414,7 +420,11 @@ export class UIController {
       error: 'syncError'
     };
     const currentStatus = !navigator.onLine && this.currentUid ? 'offline' : status;
-    this.syncStatusEl.textContent = t(keyByStatus[currentStatus] || 'syncLocal');
+    const label = t(keyByStatus[currentStatus] || 'syncLocal');
+    const cloudIcon = currentStatus === 'done'
+      ? '<svg class="sync-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .7-7.94A6 6 0 0 0 6.25 8.5 4.75 4.75 0 0 0 7 18Z"/><path d="m9.5 13.5 1.7 1.7 3.6-3.6"/></svg>'
+      : '<svg class="sync-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .7-7.94A6 6 0 0 0 6.25 8.5 4.75 4.75 0 0 0 7 18Z"/></svg>';
+    this.syncStatusEl.innerHTML = `${cloudIcon}<span>${this.escapeHTML(label)}</span>`;
     this.syncStatusEl.dataset.status = currentStatus;
   }
 
@@ -536,6 +546,15 @@ export class UIController {
     const next = current === 'dark' ? 'light' : 'dark';
     this.applyTheme(next);
     this.showToast(next === 'dark' ? t('darkModeOn') : t('darkModeOff'));
+  }
+
+  updateAuthThemeControl() {
+    const toggle = document.getElementById('authThemeToggle');
+    if (!toggle) return;
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const label = theme === 'dark' ? t('themeLight') : t('themeDark');
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
   }
 
   // --- Sorting & Submenu Handling ---
@@ -942,6 +961,7 @@ export class UIController {
     }
 
     this.updateUndoButtonState();
+    requestAnimationFrame(() => this.resizeAllTaskInputs());
   }
 
   createTaskItemHTML(task, sectionId) {
@@ -980,6 +1000,17 @@ export class UIController {
         </div>
       </div>
     `;
+  }
+
+  resizeAllTaskInputs() {
+    if (!this.sectionsContainer) return;
+    this.sectionsContainer.querySelectorAll('.task-input').forEach((input) => {
+      if (!input.isConnected) return;
+      const rect = input.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0 && getComputedStyle(input).visibility === 'hidden') return;
+      input.style.height = 'auto';
+      input.style.height = `${Math.max(input.scrollHeight, input.clientHeight, parseFloat(getComputedStyle(input).lineHeight) || 24)}px`;
+    });
   }
 
   // --- Task & Section Event Binding ---
@@ -1912,6 +1943,13 @@ export class UIController {
 
   // --- Event Binding ---
   bindEvents() {
+    const authThemeToggle = document.getElementById('authThemeToggle');
+    authThemeToggle?.addEventListener('click', () => {
+      this.toggleThemeDirectly();
+      this.updateAuthThemeControl();
+    });
+    this.updateAuthThemeControl();
+
     // Mobile Back Button
     if (this.btnBack) {
       this.btnBack.addEventListener('click', () => {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'checklists-v1.1.0-task-sync-fix';
+const CACHE_NAME = 'checklists-v1.1.0-auth-theme';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
