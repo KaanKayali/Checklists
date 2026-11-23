@@ -1,4 +1,4 @@
-const CACHE_NAME = 'checklists-v1.0.3';
+const CACHE_NAME = 'checklists-v1.1.0-auth-theme';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -8,6 +8,8 @@ const ASSETS_TO_CACHE = [
   './assets/js/storage.js',
   './assets/js/ui.js',
   './assets/js/i18n.js',
+  './assets/js/firebase.js',
+  './firebase-config.js',
   './assets/icons/favicon.png',
   './assets/icons/apple-touch-icon.png',
   './assets/icons/app-icon-192.png',

@@ -4,14 +4,45 @@
  */
 
 import { t, getLanguage, setLanguage, formatFullDate, formatTime, formatBoardTimestamp } from './i18n.js';
-import { generateId, saveData, exportDataToFile, parseImportJSON, mergeImportData, clearAllStorage, getDefaultState } from './storage.js';
+import {
+  generateId,
+  saveData,
+  exportDataToFile,
+  parseImportJSON,
+  mergeImportData,
+  clearAllStorage,
+  getDefaultState,
+  getAccountStorageKey,
+  getMigrationStorageKey,
+  hasStoredData,
+  loadData
+} from './storage.js';
+
+function stableSerialize(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
 
 export class UIController {
   constructor(state) {
     this.state = state;
+    this.migrationSource = null;
+    this.currentUid = null;
+    this.pendingLegacyFallback = false;
+    this.authReady = false;
+    this.user = null;
+    this.firebase = null;
+    this.unsubscribeBoards = null;
+    this.applyingCloudSnapshot = false;
     if (!this.state.boards) {
       this.state.boards = this.state.checklists || [];
     }
+
     this.activeTaskId = null; // Currently focused task ID for cursor logic
     this.activeSectionId = null;
     this.undoStack = [];
@@ -82,8 +113,11 @@ export class UIController {
     this.newSectionModal = document.getElementById('newSectionModal');
     this.confirmModal = document.getElementById('confirmModal');
     this.toastEl = document.getElementById('toast');
+    this.syncStatusEl = document.getElementById('syncStatus');
 
     this.init();
+    this.updateAccountUI();
+    this.updateSyncStatus('local');
   }
 
   init() {
@@ -145,7 +179,300 @@ export class UIController {
   }
 
   save() {
-    saveData(this.state);
+    const storageKey = this.currentUid ? getAccountStorageKey(this.currentUid) : undefined;
+    saveData(this.state, storageKey);
+    if (!this.currentUid) {
+      return;
+    }
+
+    if (this.pendingLegacyFallback) {
+      if (!this.applyingCloudSnapshot) {
+        this.migrationSource = JSON.parse(JSON.stringify(this.state));
+      }
+      return;
+    }
+
+    if (this.firebase && !this.applyingCloudSnapshot) {
+      this.updateSyncStatus(navigator.onLine ? 'working' : 'offline');
+      this.firebase.syncBoards(this.currentUid, this.state.boards).then(() => {
+        if (navigator.onLine) this.updateSyncStatus('done');
+      }).catch((error) => {
+        console.error('Failed to sync boards with Firestore:', error);
+        this.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+      });
+    }
+  }
+
+  setFirebase(firebase) {
+    this.firebase = firebase;
+    this.updateAccountUI();
+  }
+
+  setFirebaseUnavailable(message) {
+    this.firebase = null;
+    this.authReady = true;
+    this.updateAccountUI(message);
+    this.updateSyncStatus('local');
+  }
+
+  reportAuthStateError(message) {
+    this.authReady = true;
+    const authMessage = document.getElementById('authMessage');
+    if (authMessage) authMessage.textContent = message;
+    this.updateAccountUI();
+  }
+
+  async handleAuthState(user) {
+    const nextUid = user ? user.uid : null;
+    if (nextUid === this.currentUid) {
+      this.user = user;
+      this.authReady = true;
+      this.updateAccountUI();
+      return;
+    }
+
+    if (this.unsubscribeBoards) {
+      this.unsubscribeBoards();
+      this.unsubscribeBoards = null;
+    }
+
+    if (nextUid) {
+      this.migrationSource = JSON.parse(JSON.stringify(this.currentUid ? loadData() : this.state));
+    }
+
+    this.currentUid = nextUid;
+    this.user = user;
+    this.undoStack = [];
+
+    if (nextUid) {
+      const accountKey = getAccountStorageKey(nextUid);
+      const hasAccountBackup = hasStoredData(accountKey);
+      this.pendingLegacyFallback = !hasAccountBackup;
+      this.state = hasAccountBackup
+        ? loadData(accountKey)
+        : JSON.parse(JSON.stringify(this.migrationSource || getDefaultState()));
+      saveData(this.state, accountKey);
+      this.refreshStateView();
+      this.unsubscribeBoards = this.firebase.watchBoards(
+        nextUid,
+        (boards, metadata) => this.applyCloudSnapshot(nextUid, boards, metadata),
+        (error) => {
+          console.error('Failed to read boards from Firestore:', error);
+          this.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+        }
+      );
+    } else {
+      this.state = loadData();
+      this.migrationSource = null;
+      this.pendingLegacyFallback = false;
+      this.refreshStateView();
+    }
+
+    this.authReady = true;
+    this.updateAccountUI();
+    this.updateSyncStatus(nextUid ? 'working' : 'local');
+  }
+
+  applyCloudSnapshot(uid, cloudBoards, metadata) {
+    if (uid !== this.currentUid) return;
+
+    const fromCache = metadata.fromCache;
+    const localBoardList = this.state.boards;
+    const localBoards = new Map(localBoardList.map((board) => [board.id, board]));
+    const mergedBoards = fromCache ? new Map(localBoards) : new Map();
+
+    for (const cloudBoard of cloudBoards) {
+      const localBoard = localBoards.get(cloudBoard.id);
+      const localUpdatedAt = Number(localBoard?.updatedAt) || 0;
+      const cloudUpdatedAt = Number(cloudBoard.updatedAt) || 0;
+      const localIsNewer = localBoard && (
+        localUpdatedAt > cloudUpdatedAt ||
+        (metadata.hasPendingWrites && localUpdatedAt >= cloudUpdatedAt)
+      );
+      mergedBoards.set(cloudBoard.id, localIsNewer ? localBoard : cloudBoard);
+    }
+
+    if (!fromCache) {
+      this.offerLocalMigration(uid, mergedBoards);
+      this.pendingLegacyFallback = false;
+    }
+
+    const mergedBoardList = localBoardList
+      .filter((board) => mergedBoards.has(board.id))
+      .map((board) => mergedBoards.get(board.id));
+    for (const cloudBoard of cloudBoards) {
+      if (!localBoards.has(cloudBoard.id)) {
+        mergedBoardList.push(mergedBoards.get(cloudBoard.id));
+      }
+    }
+
+    const boardsChanged = stableSerialize(localBoardList) !== stableSerialize(mergedBoardList);
+    this.state.boards = mergedBoardList;
+    if (!this.state.boards.some((board) => board.id === this.state.activeBoardId)) {
+      this.state.activeBoardId = this.state.boards[0]?.id || null;
+    }
+
+    if (boardsChanged) {
+      this.applyingCloudSnapshot = true;
+      try {
+        this.refreshStateView();
+        this.save();
+      } finally {
+        this.applyingCloudSnapshot = false;
+      }
+    }
+
+    if (!this.pendingLegacyFallback) {
+      this.firebase.syncBoards(uid, this.state.boards).then(() => {
+        if (navigator.onLine && !metadata.hasPendingWrites) this.updateSyncStatus('done');
+      }).catch((error) => {
+        console.error('Failed to sync boards with Firestore:', error);
+        this.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+      });
+    }
+
+    if (!navigator.onLine) {
+      this.updateSyncStatus('offline');
+    } else if (fromCache || metadata.hasPendingWrites) {
+      this.updateSyncStatus('working');
+    } else {
+      this.updateSyncStatus('done');
+    }
+  }
+
+  offerLocalMigration(uid, mergedBoards) {
+    const migrationKey = getMigrationStorageKey(uid);
+    if (localStorage.getItem(migrationKey) === 'done') return;
+
+    const localBoards = this.migrationSource?.boards || [];
+    if (localBoards.length > 0) {
+      const accepted = window.confirm(t('importLocalBoardsPrompt', localBoards.length));
+      if (accepted) {
+        for (const board of localBoards) {
+          if (!mergedBoards.has(board.id)) mergedBoards.set(board.id, board);
+        }
+      }
+    }
+    localStorage.setItem(migrationKey, 'done');
+  }
+
+  refreshStateView() {
+    this.applyTheme(this.state.settings.theme);
+    setLanguage(this.state.settings.language);
+    this.renderOverview();
+    if (this.state.activeBoardId && this.getBoard(this.state.activeBoardId)) {
+      this.renderDetail();
+    } else if (window.innerWidth >= 860 && this.state.boards.length > 0) {
+      this.state.activeBoardId = this.state.boards[0].id;
+      this.renderDetail();
+    } else {
+      this.state.activeBoardId = null;
+      this.renderDetail();
+    }
+    this.restoreScrollPositions();
+    this.updateStaticTranslations();
+    this.updateSortUI();
+    this.updateUndoButtonState();
+    requestAnimationFrame(() => this.resizeAllTaskInputs());
+  }
+
+  updateAccountUI(message) {
+    const authGate = document.getElementById('authGate');
+    const authGateForm = document.getElementById('authGateForm');
+    const authLoading = document.getElementById('authLoading');
+    const authMessage = document.getElementById('authMessage');
+    const signedIn = document.getElementById('accountSignedIn');
+    const email = document.getElementById('accountEmail');
+    const warning = document.getElementById('authConfigWarning');
+    const isSignedIn = Boolean(this.user);
+
+    if (authGate) authGate.hidden = isSignedIn && this.authReady;
+    if (authGateForm) authGateForm.hidden = !this.authReady || isSignedIn;
+    if (authLoading) authLoading.hidden = this.authReady;
+    if (this.viewContainer) this.viewContainer.hidden = !isSignedIn || !this.authReady;
+    if (isSignedIn && this.authReady) {
+      requestAnimationFrame(() => {
+        this.resizeAllTaskInputs();
+      });
+    }
+    if (signedIn) signedIn.hidden = !isSignedIn;
+    if (email) email.textContent = this.user?.email || '';
+    if (warning) {
+      warning.hidden = Boolean(this.firebase) || !this.authReady;
+      if (message) warning.textContent = message;
+    }
+    ['btnLogin', 'btnRegister', 'btnGoogleLogin', 'btnPasswordReset'].forEach((id) => {
+      const button = document.getElementById(id);
+      if (button) button.disabled = !this.firebase || !this.authReady;
+    });
+    const logoutButton = document.getElementById('btnLogout');
+    if (logoutButton) logoutButton.disabled = !this.firebase || !isSignedIn;
+    if (authMessage && message) authMessage.textContent = '';
+  }
+
+  updateSyncStatus(status) {
+    if (!this.syncStatusEl) return;
+    const keyByStatus = {
+      local: 'syncLocal',
+      working: 'syncWorking',
+      done: 'syncDone',
+      offline: 'syncOffline',
+      error: 'syncError'
+    };
+    const currentStatus = !navigator.onLine && this.currentUid ? 'offline' : status;
+    const label = t(keyByStatus[currentStatus] || 'syncLocal');
+    const cloudIcon = currentStatus === 'done'
+      ? '<svg class="sync-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .7-7.94A6 6 0 0 0 6.25 8.5 4.75 4.75 0 0 0 7 18Z"/><path d="m9.5 13.5 1.7 1.7 3.6-3.6"/></svg>'
+      : '<svg class="sync-status-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 18h10a4 4 0 0 0 .7-7.94A6 6 0 0 0 6.25 8.5 4.75 4.75 0 0 0 7 18Z"/></svg>';
+    this.syncStatusEl.innerHTML = `${cloudIcon}<span>${this.escapeHTML(label)}</span>`;
+    this.syncStatusEl.dataset.status = currentStatus;
+  }
+
+  authErrorMessage(error) {
+    const code = error?.code || '';
+    const keys = {
+      'auth/invalid-email': 'authInvalidEmail',
+      'auth/email-already-in-use': 'authEmailInUse',
+      'auth/weak-password': 'authWeakPassword',
+      'auth/wrong-password': 'authWrongPassword',
+      'auth/user-not-found': 'authWrongPassword',
+      'auth/invalid-credential': 'authWrongPassword',
+      'auth/network-request-failed': 'authNetworkError',
+      'auth/too-many-requests': 'authTooManyRequests',
+      'auth/operation-not-allowed': 'authNotEnabled',
+      'auth/popup-closed-by-user': 'authGooglePopupClosed',
+      'auth/popup-blocked': 'authGooglePopupBlocked',
+      'auth/account-exists-with-different-credential': 'authAccountExists',
+      'auth/unauthorized-domain': 'authUnauthorizedDomain'
+    };
+    return t(keys[code] || 'authGenericError');
+  }
+
+  async performAuthAction(action) {
+    const email = document.getElementById('authEmail')?.value.trim();
+    const password = document.getElementById('authPassword')?.value || '';
+    const message = document.getElementById('authMessage');
+    if (!this.firebase) {
+      if (message) message.textContent = t('authConfigMissing');
+      return;
+    }
+
+    try {
+      if (action === 'login') await this.firebase.loginWithEmail(email, password);
+      if (action === 'register') await this.firebase.registerWithEmail(email, password);
+      if (action === 'google') await this.firebase.loginWithGoogle();
+      if (action === 'reset') {
+        if (!email) {
+          if (message) message.textContent = t('authInvalidEmail');
+          return;
+        }
+        await this.firebase.resetPassword(email);
+        if (message) message.textContent = t('authResetSent');
+      }
+    } catch (error) {
+      console.error('Firebase authentication failed:', error);
+      if (message) message.textContent = this.authErrorMessage(error);
+    }
   }
 
   getActiveBoard() {
@@ -219,6 +546,15 @@ export class UIController {
     const next = current === 'dark' ? 'light' : 'dark';
     this.applyTheme(next);
     this.showToast(next === 'dark' ? t('darkModeOn') : t('darkModeOff'));
+  }
+
+  updateAuthThemeControl() {
+    const toggle = document.getElementById('authThemeToggle');
+    if (!toggle) return;
+    const theme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const label = theme === 'dark' ? t('themeLight') : t('themeDark');
+    toggle.setAttribute('aria-label', label);
+    toggle.title = label;
   }
 
   // --- Sorting & Submenu Handling ---
@@ -625,6 +961,7 @@ export class UIController {
     }
 
     this.updateUndoButtonState();
+    requestAnimationFrame(() => this.resizeAllTaskInputs());
   }
 
   createTaskItemHTML(task, sectionId) {
@@ -663,6 +1000,17 @@ export class UIController {
         </div>
       </div>
     `;
+  }
+
+  resizeAllTaskInputs() {
+    if (!this.sectionsContainer) return;
+    this.sectionsContainer.querySelectorAll('.task-input').forEach((input) => {
+      if (!input.isConnected) return;
+      const rect = input.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0 && getComputedStyle(input).visibility === 'hidden') return;
+      input.style.height = 'auto';
+      input.style.height = `${Math.max(input.scrollHeight, input.clientHeight, parseFloat(getComputedStyle(input).lineHeight) || 24)}px`;
+    });
   }
 
   // --- Task & Section Event Binding ---
@@ -1595,6 +1943,13 @@ export class UIController {
 
   // --- Event Binding ---
   bindEvents() {
+    const authThemeToggle = document.getElementById('authThemeToggle');
+    authThemeToggle?.addEventListener('click', () => {
+      this.toggleThemeDirectly();
+      this.updateAuthThemeControl();
+    });
+    this.updateAuthThemeControl();
+
     // Mobile Back Button
     if (this.btnBack) {
       this.btnBack.addEventListener('click', () => {
@@ -1835,6 +2190,18 @@ export class UIController {
       this.saveScrollPosition();
     });
 
+    window.addEventListener('online', () => {
+      if (!this.currentUid) return;
+      this.updateSyncStatus('working');
+      this.firebase?.syncBoards(this.currentUid, this.state.boards).catch((error) => {
+        console.error('Failed to sync boards after reconnecting:', error);
+        this.updateSyncStatus('error');
+      });
+    });
+    window.addEventListener('offline', () => {
+      if (this.currentUid) this.updateSyncStatus('offline');
+    });
+
     if (window.matchMedia) {
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
         if (this.state.settings.theme === 'system') {
@@ -1848,6 +2215,7 @@ export class UIController {
   populateSettingsForm() {
     const langSelect = document.getElementById('settingLanguage');
     if (langSelect) langSelect.value = this.state.settings.language || 'en';
+    this.updateAccountUI();
   }
 
   bindSettingsEvents() {
@@ -1857,6 +2225,28 @@ export class UIController {
     const btnImport = document.getElementById('btnImportData');
     const importFileInput = document.getElementById('importFileInput');
     const btnResetAll = document.getElementById('btnResetAllData');
+
+    document.getElementById('authForm')?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      this.performAuthAction('login');
+    });
+    document.getElementById('btnRegister')?.addEventListener('click', () => {
+      this.performAuthAction('register');
+    });
+    document.getElementById('btnGoogleLogin')?.addEventListener('click', () => {
+      this.performAuthAction('google');
+    });
+    document.getElementById('btnPasswordReset')?.addEventListener('click', () => {
+      this.performAuthAction('reset');
+    });
+    document.getElementById('btnLogout')?.addEventListener('click', async () => {
+      try {
+        await this.firebase.logout();
+      } catch (error) {
+        console.error('Firebase sign-out failed:', error);
+        this.showToast(this.authErrorMessage(error));
+      }
+    });
 
     langSelect?.addEventListener('change', () => {
       const newLang = langSelect.value;
@@ -1897,8 +2287,10 @@ export class UIController {
 
         const shouldReplace = window.confirm(`${t('importReplaceOrMerge')}\n\nOK: ${t('importMerge')}\nCancel: ${t('importReplace')}`);
         this.state = mergeImportData(this.state, parsed, !shouldReplace);
+        this.undoStack = [];
+        this.cleanUpEmptyTasks();
         this.save();
-        this.init();
+        this.refreshStateView();
         this.closeModal(this.settingsModal);
         this.showToast(t('importSuccess'));
       };
@@ -1912,10 +2304,10 @@ export class UIController {
         t('confirmResetData'),
         t('resetData'),
         () => {
-          clearAllStorage();
+          clearAllStorage(this.currentUid ? getAccountStorageKey(this.currentUid) : undefined);
           this.state = getDefaultState();
-          this.save();
-          this.init();
+          this.undoStack = [];
+          this.refreshStateView();
           this.closeModal(this.settingsModal);
           this.showToast(t('resetSuccess'));
         }

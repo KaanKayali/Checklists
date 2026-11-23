@@ -7,7 +7,7 @@ For phones, tablets, laptops, and desktop computers.
 
 <img src="assets/icons/brand-logo.png" alt="Checklists logo" height="88">
 
-![Version](https://img.shields.io/badge/version-1.0.0-ffc114?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.1.0-ffc114?style=flat-square)
 ![PWA](https://img.shields.io/badge/PWA-installable-4c8c69?style=flat-square)
 
 <br>
@@ -27,7 +27,7 @@ For phones, tablets, laptops, and desktop computers.
 
 I mainly made this app for myself: a straightforward place to organize everyday tasks, with the features and look I wanted. The app's interface language can be selected in the project: English or German.
 
-> **Current app version: 1.0.0**
+> **Current app version: 1.1.0**
 
 ### Features
 
@@ -54,8 +54,9 @@ I mainly made this app for myself: a straightforward place to organize everyday 
 - **English and German:** Switch the app language between English and German.
 
 #### Data and offline use
-- **Offline-ready:** The app is designed to work offline after it has been loaded.
-- **Local storage:** Your checklists are saved in your browser on your device.
+- **Offline-ready:** Boards are cached by Firestore and continue to work offline after they have been loaded.
+- **Cloud sync:** Sign in with email/password or Google to sync your boards between devices. An account is required to use the app.
+- **Local backup:** Boards are also kept in browser storage; existing local boards can be imported into an account.
 - **JSON import and export:** Back up or move your checklist data.
 
 ### Install the app
@@ -71,9 +72,9 @@ I mainly made this app for myself: a straightforward place to organize everyday 
 2. Find the **Install** icon in the address bar, or open the browser menu and choose **Install Checklists**.
 3. Confirm to add Checklists to your device.
 
-### Future plans
+### Firebase setup for accounts and cloud sync
 
-An account-management backend with login and online synchronization may be added in a future update. This would let users sync their checklists across devices. **Accounts and cloud sync are not available in the current version**; checklist data is currently stored locally in the browser.
+Checklists uses Firebase directly from the browser; it does not require a custom server or build step.
 
 ### License
 

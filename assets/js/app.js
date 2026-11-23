@@ -5,13 +5,41 @@
 
 import { loadData } from './storage.js';
 import { UIController } from './ui.js';
+import { isFirebaseConfigured } from '../../firebase-config.js';
+import { t } from './i18n.js';
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   // 1. Load initial persistent state
   const state = loadData();
 
   // 2. Initialize UI Controller
   const ui = new UIController(state);
+
+  if (isFirebaseConfigured()) {
+    try {
+      const firebase = await import('./firebase.js');
+      ui.setFirebase(firebase);
+      firebase.observeAuth(
+        (user) => {
+          ui.handleAuthState(user).catch((error) => {
+            console.error('Failed to initialize the signed-in account:', error);
+            ui.reportAuthStateError(t('authGenericError'));
+            ui.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+          });
+        },
+        (error) => {
+          console.error('Firebase authentication state failed:', error);
+          ui.reportAuthStateError(t('authGenericError'));
+          ui.updateSyncStatus(navigator.onLine ? 'error' : 'offline');
+        }
+      );
+    } catch (error) {
+      console.error('Firebase could not be initialized:', error);
+      ui.setFirebaseUnavailable(isFirebaseConfigured() ? t('authNetworkError') : undefined);
+    }
+  } else {
+    ui.setFirebaseUnavailable();
+  }
 
   // 3. Register Progressive Web App Service Worker
   if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {

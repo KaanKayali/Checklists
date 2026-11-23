@@ -5,6 +5,18 @@
 
 const STORAGE_KEY = 'checklists_app_data_v1';
 
+export function getAccountStorageKey(uid) {
+  return `${STORAGE_KEY}_user_${uid}`;
+}
+
+export function getMigrationStorageKey(uid) {
+  return `${STORAGE_KEY}_migration_${uid}`;
+}
+
+export function hasStoredData(key = STORAGE_KEY) {
+  return localStorage.getItem(key) !== null;
+}
+
 export function generateId(prefix = 'id') {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
     return `${prefix}_${crypto.randomUUID().slice(0, 8)}`;
@@ -32,13 +44,11 @@ export function getDefaultState() {
   };
 }
 
-export function loadData() {
+export function loadData(key = STORAGE_KEY) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(key);
     if (!raw) {
-      const initial = getDefaultState();
-      saveData(initial);
-      return initial;
+      return getDefaultState();
     }
     const parsed = JSON.parse(raw);
     
@@ -49,7 +59,7 @@ export function loadData() {
 
     if (!parsed || !Array.isArray(parsed.boards)) {
       const fallback = getDefaultState();
-      saveData(fallback);
+      saveData(fallback, key);
       return fallback;
     }
 
@@ -85,11 +95,11 @@ export function loadData() {
   }
 }
 
-export function saveData(data) {
+export function saveData(data, key = STORAGE_KEY) {
   try {
     data.checklists = data.boards;
     data.activeChecklistId = data.activeBoardId;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(key, JSON.stringify(data));
   } catch (err) {
     console.error('Failed to save data to localStorage:', err);
   }
@@ -179,6 +189,6 @@ export function mergeImportData(existingState, importedPayload, replaceMode = fa
   };
 }
 
-export function clearAllStorage() {
-  localStorage.removeItem(STORAGE_KEY);
+export function clearAllStorage(key = STORAGE_KEY) {
+  localStorage.removeItem(key);
 }
